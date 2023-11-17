@@ -2,24 +2,21 @@ package org.fischman.alarmingnotifications
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
 import android.provider.Settings
 import android.util.Log
-import androidx.appcompat.app.AppCompatActivity
 
 
 class MainActivity : Activity() {
-    val DEBUG = false
-    fun log(msg: String) { if (DEBUG) Log.e("AMI", msg) }
+    private val DEBUG = false
+    private fun log(msg: String) { if (DEBUG) Log.e("AMI", msg) }
 
     override fun onResume() {
         super.onResume()
 
         // For development and debugging: directly launch the AlarmActivity.
         if (false) {
-            var i = Intent("$packageName.AlarmActivity")
+            val i = Intent("$packageName.AlarmActivity")
             i.flags = Intent.FLAG_ACTIVITY_NEW_TASK
             i.putExtra("label", "DEBUGGING from MainActivity")
             startActivity(i)
@@ -29,7 +26,7 @@ class MainActivity : Activity() {
 
         val appName = resources.getString(R.string.app_name)
 
-        if (!Settings.Secure.getString(getContentResolver(),"enabled_notification_listeners").contains(
+        if (!Settings.Secure.getString(contentResolver,"enabled_notification_listeners").contains(
                 "$packageName/$packageName.NotificationListener")) {
             log("Not already listening for notifications, launching settings")
             alert(this, "Need Permission", "Please grant the \"Device & app notifications\" permission for $appName and then restart the app") {
@@ -53,18 +50,17 @@ class MainActivity : Activity() {
         alert(this,"Yay", "All permissions granted, now awaiting notifications.\nFeel free to dismiss this app now, notifications will be watched in the background.") {}
     }
 
-    fun alert(activity: Activity, title: String, msg: String, onOK: () -> Unit) {
+    private fun alert(activity: Activity, title: String, msg: String, onOK: () -> Unit) {
         val alertDialog = AlertDialog.Builder(this@MainActivity).create()
         alertDialog.setTitle(title)
         alertDialog.setMessage(msg)
-        alertDialog.setButton(AlertDialog.BUTTON_POSITIVE, "OK",
-            DialogInterface.OnClickListener { dialog, _ ->
-                run {
-                    dialog.dismiss()
-                    onOK()
-                    activity.finish()
-                }
-            })
+        alertDialog.setButton(AlertDialog.BUTTON_POSITIVE, "OK") { dialog, _ ->
+            run {
+                dialog.dismiss()
+                onOK()
+                activity.finish()
+            }
+        }
         alertDialog.show()
     }
 }

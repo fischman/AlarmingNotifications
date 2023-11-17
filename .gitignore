@@ -1,5 +1,7 @@
 *.iml
 .gradle
+/app/debug
+/app/release
 /local.properties
 /.idea/caches
 /.idea/libraries
@@ -7,6 +9,7 @@
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+/.idea/vcs.xml
 .DS_Store
 /build
 /captures

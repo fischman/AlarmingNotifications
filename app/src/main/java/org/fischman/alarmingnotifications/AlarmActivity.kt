@@ -16,7 +16,7 @@ import android.widget.TextView
 
 class AlarmActivity : Activity() {
     private val DEBUG = false
-    fun log(msg: String) { if (DEBUG) Log.e("AMI", msg) }
+    private fun log(msg: String) { if (DEBUG) Log.e("AMI", msg) }
 
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {

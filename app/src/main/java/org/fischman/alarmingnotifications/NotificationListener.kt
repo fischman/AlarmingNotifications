@@ -8,7 +8,7 @@ import android.util.Log
 
 class NotificationListener : NotificationListenerService() {
     private val DEBUG = false
-    fun log(msg: String) { if (DEBUG) Log.e("AMI", msg) }
+    private fun log(msg: String) { if (DEBUG) Log.e("AMI", msg) }
 
     override fun onListenerConnected() = log("onListenerConnected")
     override fun onListenerDisconnected() = log("onListenerDisconnected")
@@ -32,18 +32,18 @@ class NotificationListener : NotificationListenerService() {
         if (false) {
             val textFields = listOf(Notification.EXTRA_TEXT, Notification.EXTRA_TEXT_LINES, Notification.EXTRA_BIG_TEXT, Notification.EXTRA_INFO_TEXT, Notification.EXTRA_SUB_TEXT, Notification.EXTRA_SUMMARY_TEXT, Notification.EXTRA_VERIFICATION_TEXT)
             val textContents = "${sbn.notification.tickerText}\n${
-                textFields.map { fieldName: String ->
+                textFields.joinToString(separator = "\n") { fieldName: String ->
                     "$fieldName - ${notification.extras.getString(fieldName)}"
-                }.joinToString(separator = "\n")
+                }
             }"
             log("All text-related fields from notification: $textContents")
             log("Full notification: $sbn")
             log("and extras: ${notification.extras}")
         }
 
-        val label = tickerText?:"" + "\n" + extraText?:""
+        val label = (tickerText?:"") + "\n" + (extraText?:"")
         log("onNotificationPosted: $label")
-        var i = Intent("$packageName.AlarmActivity")
+        val i = Intent("$packageName.AlarmActivity")
         i.flags = Intent.FLAG_ACTIVITY_NEW_TASK
         i.putExtra("label", label)
         startActivity(i)
