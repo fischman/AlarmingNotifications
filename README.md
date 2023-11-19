@@ -44,6 +44,8 @@ mechanism of choice.
 
 ## Potential future features
 - Non-stock launcher icon...
+- Add a "snooze" functionality
+- Add (silent) notifications of upcoming alarms. Seems strange to have a notification for an upcoming notification for an upcoming event, but I've found myself missing Clock's Alarms' behavior of showing notifications for Alarms that are scheduled for less than 2h away.
 - Allow the user to configure arbitrary matching rules for notifications to trigger alarms.
 - Make the alarm ringtone and volume configurable.
 
