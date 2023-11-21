@@ -1,20 +1,37 @@
 package org.fischman.alarmingnotifications
 
 import android.app.Notification
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
+import android.media.AudioManager
+import android.media.MediaPlayer
+import android.media.RingtoneManager
+import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import kotlin.random.Random
+
 
 class NotificationListener : NotificationListenerService() {
     private val DEBUG = false
     private fun log(msg: String) { if (DEBUG) Log.e("AMI", msg) }
 
+    private val mp = MediaPlayer()
+
     override fun onListenerConnected() = log("onListenerConnected")
     override fun onListenerDisconnected() = log("onListenerDisconnected")
 
+    override fun onCreate() {
+        super.onCreate()
+        mp.setDataSource(applicationContext, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
+        mp.setAudioStreamType(AudioManager.STREAM_ALARM)
+        mp.isLooping = true
+
+    }
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (// sbn.packageName != "com.google.android.gm") && // Debug using Gmail chat notifications.
+        if (// sbn.packageName != "com.google.android.gm" && // Debug using Gmail chat notifications.
             sbn.packageName != "com.google.android.calendar") {
             return
         }
@@ -43,15 +60,54 @@ class NotificationListener : NotificationListenerService() {
 
         val label = (tickerText?:"") + "\n" + (extraText?:"")
         log("onNotificationPosted: $label")
-        val i = Intent("$packageName.AlarmActivity")
-        i.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        i.putExtra("label", label)
-        startActivity(i)
+
+        mp.prepare()
+        mp.start()
+        val notificationID: Int = Random.nextInt(0, 999999)
+        val intent = Intent(this, NotificationListener::class.java)
+        intent.putExtra("action", "stop")
+        intent.putExtra("notificationID", notificationID)
+        val stopPlayingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        val notificationBuilder =
+            Notification.Builder(this, notificationChannelID)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setContentTitle(label)
+                .setContentText("")
+                .setCategory(Notification.CATEGORY_ALARM)
+                .addAction(
+                    Notification.Action.Builder(android.R.drawable.stat_notify_call_mute, "Stop", stopPlayingIntent)
+                    .setSemanticAction(Notification.Action.SEMANTIC_ACTION_MUTE)
+                    .build())
+        notificationManager.notify(notificationID, notificationBuilder.build())
     }
 
+    private fun bundleToString(bundle: Bundle?): String {
+        if (bundle == null) return "(null bundle))"
+        var str = "Bundle{"
+        for (key in bundle.keySet()) str += " $key: ${bundle[key]};"
+        str += "}"
+        return str
+    }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        log("extras: ${bundleToString(intent?.extras)}")
+        val action = intent?.getStringExtra("action")
+        val notificationID = intent?.getIntExtra("notificationID", -2) ?: -3
+        if (action != null && notificationID >= 0) dismiss(notificationID)
+        else {
+            if (action != null) Log.e("AMI", "onStartCommand: action $action is not null but notificationID is $notificationID!")
+            if (notificationID >= 0) Log.e("AMI", "onStartCommand: action is $action but notificationID isn't negative: $notificationID!")
+        }
+        return START_NOT_STICKY
+    }
 
-
+    private fun dismiss(notificationID: Int) {
+        log("dismiss: notificationID: ${notificationID}")
+        if (mp.isPlaying) { mp.stop() }
+        getSystemService(NotificationManager::class.java).cancel(notificationID)
+    }
 }
 
 /*

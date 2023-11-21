@@ -2,8 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="org.fischman.alarmingnotifications">
-    <uses-permission android:name="android.permission.ACTION_MANAGE_OVERLAY_PERMISSION" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
         android:allowBackup="true"
@@ -13,20 +12,9 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:name=".ANapp"
         tools:targetApi="31">
 
-        <activity
-            android:name=".AlarmActivity"
-            android:configChanges="orientation|keyboardHidden|screenSize"
-            android:exported="false"
-            android:label="@string/title_activity_alarm"
-            android:permission="android.permission.SYSTEM_ALERT_WINDOW">
-            <intent-filter>
-                <action android:name="org.fischman.alarmingnotifications.AlarmActivity" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-
-        </activity>
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -44,14 +32,6 @@
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
-            <!-- <meta-data -->
-            <!-- android:name="android.service.notification.default_filter_types" -->
-            <!-- android:value="conversations|alerting"> -->
-            <!-- </meta-data> -->
-            <!-- <meta-data -->
-            <!-- android:name="android.service.notification.disabled_filter_types" -->
-            <!-- android:value="ongoing|silent"> -->
-            <!-- </meta-data> -->
         </service>
     </application>
 

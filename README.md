@@ -16,23 +16,24 @@ be much nicer.
 Every notification on the phone is reviewed. If it came from Google
 Calendar and isn't a "Tomorrow" notification (i.e. for a full-day
 event), the phone-default Alarm ringtone will be played and a
-full-screen UI will display until a dismiss button is tapped.
+high-priority notification will display until its `Stop` button is
+tapped.
 
 ## How it works
 This "app" registers an [Android Notifications Listener Service](https://developer.android.com/reference/android/service/notification/NotificationListenerService)
 that gets notified of every notification the phone displays.  When a
-notification matches its criteria, it triggers an AlarmActivity with
-(hopefully) enough text from the notification to tell the user what
-they're late for. This activity UI will display over anything else the
-user is currently doing to make dismissing the ringtone easy.
+notification matches its criteria, it triggers a high-priority
+notification with (hopefully) enough text from the original
+notification to tell the user what they're late for. This
+high-priority notification will display over anything else the user is
+currently doing to make dismissing the ringtone easy.
 
-The above requires two powerful permissions: the ability to read all
-notifications and the ability to show a UI regardless of what else the
-user is doing. After installing, you'll have to grant these
-permissions using a not-very-intuitive UI (that might differ among
-Android vendors; I'm only testing on a Google Pixel device).  Because
-of the power of these permissions, at least one of them will show a
-scary consent screen.
+The above requires two permissions: the ability to read all
+notifications, and the ability to post notifications of its own. After
+installing, you'll have to grant these permissions using a
+not-very-intuitive UI (that might differ among Android vendors; I'm
+only testing on a Google Pixel device).  At least the "Read
+notifications" permission will show a scary consent screen.
 
 ## How to install
 This isn't (yet?) available in Google's Play app store.
