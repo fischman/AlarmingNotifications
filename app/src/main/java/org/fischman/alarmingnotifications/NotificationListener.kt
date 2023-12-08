@@ -76,6 +76,9 @@ class NotificationListener : NotificationListenerService() {
                 .setContentTitle(label)
                 .setContentText("")
                 .setCategory(Notification.CATEGORY_ALARM)
+                .setOngoing(true)
+                .setFlag(Notification.FLAG_NO_CLEAR, true)
+                .setDeleteIntent(stopPlayingIntent)
                 .addAction(
                     Notification.Action.Builder(android.R.drawable.stat_notify_call_mute, "Stop", stopPlayingIntent)
                     .setSemanticAction(Notification.Action.SEMANTIC_ACTION_MUTE)
