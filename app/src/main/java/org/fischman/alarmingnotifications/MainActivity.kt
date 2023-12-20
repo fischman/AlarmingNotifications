@@ -23,7 +23,7 @@ class MainActivity : Activity() {
         when {
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED -> {}
             else -> {
-                alert(this, "Permission to Send Notifications",
+                alert("Permission to Send Notifications",
                     "To work correctly, this app needs permission to send you notifications. Please allow this on the next screen.") {
                     requestPermissions(
                         arrayOf(Manifest.permission.POST_NOTIFICATIONS),
@@ -37,7 +37,7 @@ class MainActivity : Activity() {
         if (!Settings.Secure.getString(contentResolver,"enabled_notification_listeners").contains(
                 "$packageName/$packageName.NotificationListener")) {
             log("Not already listening for notifications, launching settings")
-            alert(this, "Permission to Read Notifications",
+            alert("Permission to Read Notifications",
                 "Please grant the \"Device & app notifications\" permission for ${resources.getString(R.string.app_name)} and then restart the app.") {
                 startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                 finish()
@@ -47,11 +47,11 @@ class MainActivity : Activity() {
             log("Already listening for notifications, yay")
         }
 
-        alert(this,"Yay", "All permissions granted, now awaiting notifications.\nFeel free to dismiss this app now, notifications will be watched in the background.") { finish() }
+        alert("Yay", "All permissions granted, now awaiting notifications.\nFeel free to dismiss this app now, notifications will be watched in the background.") { finish() }
     }
 
-    private fun alert(activity: Activity, title: String, msg: String, onOK: () -> Unit) {
-        val alertDialog = AlertDialog.Builder(this@MainActivity)
+    private fun alert(title: String, msg: String, onOK: () -> Unit) {
+        AlertDialog.Builder(this@MainActivity)
             .setTitle(title)
             .setMessage(msg)
             .setPositiveButton("OK") { dialog, _ ->
