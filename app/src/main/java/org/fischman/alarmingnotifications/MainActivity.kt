@@ -3,8 +3,6 @@ package org.fischman.alarmingnotifications
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
-import android.app.Notification
-import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.provider.Settings
@@ -12,22 +10,22 @@ import android.util.Log
 
 
 class MainActivity : Activity() {
-    private val DEBUG = false
-    private fun log(msg: String) { if (DEBUG) Log.e("AMI", msg) }
-
-    private val permissionRequestCode = 42
+    private val debug = false
+    private fun log(msg: String) { if (debug) Log.e("AMI", msg) }
 
     override fun onResume() {
         super.onResume()
 
-        when {
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED -> {}
+        when (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)) {
+            PackageManager.PERMISSION_GRANTED -> {}
             else -> {
-                alert("Permission to Send Notifications",
-                    "To work correctly, this app needs permission to send you notifications. Please allow this on the next screen.") {
+                alert(
+                    "Permission to Send Notifications",
+                    "To work correctly, this app needs permission to send you notifications. Please allow this on the next screen."
+                ) {
                     requestPermissions(
                         arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                        permissionRequestCode
+                        -1, // Request code is unused since we don't listen for rejections.
                     )
                 }
                 return
