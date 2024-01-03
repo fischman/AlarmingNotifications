@@ -20,19 +20,6 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
 
-        Log.e("YO1", "Starting to collect all apps' names & packages")
-        var apps = arrayOf("")
-        // getPackagesHoldingPermissions takes 180-280ms on a Pixel 8 with 155 apps installed.
-        val packages = packageManager.getPackagesHoldingPermissions(arrayOf("android.permission.POST_NOTIFICATIONS"), PackageManager.GET_ACTIVITIES)
-        Log.e("YO1", "number of apps: ${packages.size}")
-        // This loop takes another 800ms to run.
-        for (l in packages) {
-            if (!l.applicationInfo.enabled) { continue }
-            apps += "${l.applicationInfo.loadLabel(packageManager)} - ${l.packageName}"
-            val d = l.applicationInfo.loadIcon(packageManager)
-        }
-        Log.e("YO1", "done:\n${apps.joinToString("\n")}")
-
         when {
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED -> {}
             else -> {
