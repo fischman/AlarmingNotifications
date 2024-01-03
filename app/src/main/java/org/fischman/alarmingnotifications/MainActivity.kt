@@ -2,7 +2,9 @@ package org.fischman.alarmingnotifications
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlarmManager
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -27,11 +29,26 @@ class MainActivity : Activity() {
                     ) {
                         requestPermissions(
                             arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                            -1, // Request code is unused since we don't listen for rejections.
+                            0, // Request code is unused since we don't listen for rejections. But the platform requires this to be >=0.
                         )
                     }
                     return
                 }
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= 31) {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            if (!alarmManager.canScheduleExactAlarms()) {
+                log("Not already allowed to schedule exact alarms, launching settings")
+                alert("Permission to set exact alarms",
+                    "Please grant the \"Alarms & reminders\" permission for ${resources.getString(R.string.app_name)} to enable snooze functionality.") {
+                    startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                    finish()
+                }
+                return
+            } else {
+                log("Already listening for notifications, yay")
             }
         }
 

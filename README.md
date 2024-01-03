@@ -44,7 +44,6 @@ mechanism of choice.
 
 
 ## Potential future features
-- Add a "snooze" functionality
 - Allow the user to configure arbitrary matching rules for notifications to trigger alarms.
 - Make the alarm ringtone and volume configurable.
 

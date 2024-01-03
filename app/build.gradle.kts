@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "org.fischman.alarmingnotifications"
-        minSdk = 24
+        minSdk = 30
         targetSdk = 33
         versionCode = 1
         versionName = "1.0"
