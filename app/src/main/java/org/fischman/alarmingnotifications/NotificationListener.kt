@@ -40,20 +40,11 @@ class NotificationListener : NotificationListenerService() {
             return
         }
 
-        val notification = sbn.notification
-        val tickerText = notification.tickerText?.toString()
-        val extraText = notification.extras.getString(Notification.EXTRA_TEXT)
-        if (tickerText == null && extraText == null) {
-            log("Both ticker and extras text are null, so ignoring notification"); return
-        }
-        // Ignore all-day events with this one weird trick! Unfortunately doesn't seem to be any
-        // other indication of all-day nature of an event other than this text (and absence of a
-        // time-window instead).
-        if (notification.extras.getString(Notification.EXTRA_TEXT) == "Tomorrow") return
-
         // Other places that text can be stored in in Notifications. Possibly of future interest for apps other than GCal and GMail.
         if (false) {
             val textFields = mutableListOf(
+                Notification.EXTRA_TITLE,
+                Notification.EXTRA_TITLE_BIG,
                 Notification.EXTRA_BIG_TEXT,
                 Notification.EXTRA_INFO_TEXT,
                 Notification.EXTRA_SUB_TEXT,
@@ -66,15 +57,30 @@ class NotificationListener : NotificationListenerService() {
             }
             val textContents = "${sbn.notification.tickerText}\n${
                 textFields.joinToString(separator = "\n") { fieldName: String ->
-                    "$fieldName - ${notification.extras.getString(fieldName)}"
+                    "$fieldName - ${sbn.notification.extras.getString(fieldName)}"
                 }
             }"
             log("All text-related fields from notification: $textContents")
             log("Full notification: $sbn")
-            log("and extras: ${notification.extras}")
+            log("and extras: ")
+            for (key in sbn.notification.extras.keySet()) {
+                log("key:"+key + ", value: " + sbn.notification.extras.getString(key))
+            }
         }
 
-        val label = ((tickerText ?: "") + "\n" + (extraText ?: "")).trim()
+        val notification = sbn.notification
+        val tickerText = notification.tickerText?.toString()
+        val extraText = notification.extras.getString(Notification.EXTRA_TEXT)
+        val titleText = notification.extras.getString(Notification.EXTRA_TITLE)
+        if (tickerText == null && extraText == null && titleText == null) {
+            log("Both ticker and extras text are null, so ignoring notification"); return
+        }
+        // Ignore all-day events with this one weird trick! Unfortunately doesn't seem to be any
+        // other indication of all-day nature of an event other than this text (and absence of a
+        // time-window instead).
+        if (notification.extras.getString(Notification.EXTRA_TEXT) == "Tomorrow") return
+
+        val label = ((tickerText ?: "") + "\n" + (extraText ?: "") + "\n" + (titleText ?: "")).trim()
         log("onNotificationPosted: $label")
         showNotification(label)
     }
