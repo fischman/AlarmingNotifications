@@ -33,14 +33,12 @@ class NotificationListener : NotificationListenerService() {
         @Suppress("DEPRECATION")
         mp.setAudioStreamType(AudioManager.STREAM_ALARM)
         mp.isLooping = true
-
     }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (// sbn.packageName != "com.google.android.gm" && // Debug using Gmail chat notifications.
-            sbn.packageName != "com.google.android.calendar"
-        ) {
-            return
-        }
+        val interesting = // (debug && sbn.packageName == "com.google.android.gm") || // Debug using Gmail chat notifications.
+                sbn.packageName == "com.google.android.calendar"
+        if (!interesting) { return }
 
         // Other places that text can be stored in in Notifications. Possibly of future interest for apps other than GCal and GMail.
         if (0 > 1) {
@@ -114,7 +112,6 @@ class NotificationListener : NotificationListenerService() {
                 .setContentTitle(label)
                 .setContentText("")
                 .setCategory(Notification.CATEGORY_CALL)
-                .setOngoing(true)
                 .setFlag(Notification.FLAG_NO_CLEAR, true)
                 .setDeleteIntent(stopIntent)
                 .addAction(
