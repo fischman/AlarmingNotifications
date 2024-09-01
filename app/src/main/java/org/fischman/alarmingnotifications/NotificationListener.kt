@@ -19,8 +19,10 @@ import kotlin.random.Random
 
 
 class NotificationListener : NotificationListenerService() {
-    private val debug = false
-    private fun log(msg: String) { if (debug) Log.e("AMI", msg) }
+    private val debug = true
+    private fun log(msg: String) {
+        if (debug) println(msg)
+    }
 
     private val mp = MediaPlayer()
 
@@ -29,16 +31,28 @@ class NotificationListener : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate()
-        mp.setDataSource(applicationContext, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
+        mp.setDataSource(
+            applicationContext,
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+        )
         @Suppress("DEPRECATION")
         mp.setAudioStreamType(AudioManager.STREAM_ALARM)
         mp.isLooping = true
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        val interesting = // (debug && sbn.packageName == "com.google.android.gm") || // Debug using Gmail chat notifications.
-                sbn.packageName == "com.google.android.calendar"
-        if (!interesting) { return }
+        val mutedUntilStr = mutedUntil(this)
+        if (mutedUntilStr != "") {
+            log("Suppressing notification because muted until $mutedUntilStr")
+            return
+        }
+
+        val interesting =
+            // (debug && sbn.packageName == "com.google.android.gm") || // Debug using Gmail chat notifications.
+            sbn.packageName == "com.google.android.calendar"
+        if (!interesting) {
+            return
+        }
 
         // Other places that text can be stored in in Notifications. Possibly of future interest for apps other than GCal and GMail.
         if (0 > 1) {
@@ -83,18 +97,30 @@ class NotificationListener : NotificationListenerService() {
         // Ignore notifications for events that start after 2am tomorrow.
         if (extraText?.contains("Tomorrow, (0[2-9]|1|2)".toRegex()) == true) return
 
-        val label = ((tickerText ?: "") + "\n" + (extraText ?: "") + "\n" + (titleText ?: "")).trim()
+        val label =
+            ((tickerText ?: "") + "\n" + (extraText ?: "") + "\n" + (titleText ?: "")).trim()
         log("onNotificationPosted: $label")
         showNotification(label, sbn.key)
     }
 
-    private fun createPendingIntent(requestCode: Int, action: String, notificationID: Int, label: String, originalNotificationKey: String): PendingIntent {
+    private fun createPendingIntent(
+        requestCode: Int,
+        action: String,
+        notificationID: Int,
+        label: String,
+        originalNotificationKey: String
+    ): PendingIntent {
         val intent = Intent(this, NotificationListener::class.java)
         intent.putExtra("action", action)
         intent.putExtra("notificationID", notificationID)
         intent.putExtra("label", label)
         intent.putExtra("originalNotificationKey", originalNotificationKey)
-        return PendingIntent.getService(this, requestCode, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        return PendingIntent.getService(
+            this,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
     }
 
     @Suppress("DEPRECATION")
@@ -103,9 +129,12 @@ class NotificationListener : NotificationListenerService() {
         mp.start()
 
         val notificationID = Random.nextInt(0, 999999)
-        val stopIntent = createPendingIntent(0, "stop", notificationID, label, originalNotificationKey)
-        val snooze1mIntent = createPendingIntent(1, "snooze1m", notificationID, label, originalNotificationKey)
-        val snooze5mIntent = createPendingIntent(2, "snooze5m", notificationID, label, originalNotificationKey)
+        val stopIntent =
+            createPendingIntent(0, "stop", notificationID, label, originalNotificationKey)
+        val snooze1mIntent =
+            createPendingIntent(1, "snooze1m", notificationID, label, originalNotificationKey)
+        val snooze5mIntent =
+            createPendingIntent(2, "snooze5m", notificationID, label, originalNotificationKey)
 
         val notificationManager = getSystemService(NotificationManager::class.java)
         val notificationBuilder =
@@ -118,17 +147,32 @@ class NotificationListener : NotificationListenerService() {
                 .setFlag(Notification.FLAG_NO_CLEAR, true)
                 .setDeleteIntent(stopIntent)
                 .addAction(
-                    Notification.Action.Builder(android.R.drawable.stat_notify_call_mute, "Stop", stopIntent)
+                    Notification.Action.Builder(
+                        android.R.drawable.stat_notify_call_mute,
+                        "Stop",
+                        stopIntent
+                    )
                         .setSemanticAction(Notification.Action.SEMANTIC_ACTION_MUTE)
-                        .build())
+                        .build()
+                )
                 .addAction(
-                    Notification.Action.Builder(android.R.drawable.stat_notify_call_mute, "Snooze 1m", snooze1mIntent)
+                    Notification.Action.Builder(
+                        android.R.drawable.stat_notify_call_mute,
+                        "Snooze 1m",
+                        snooze1mIntent
+                    )
                         .setSemanticAction(Notification.Action.SEMANTIC_ACTION_MUTE)
-                        .build())
+                        .build()
+                )
                 .addAction(
-                    Notification.Action.Builder(android.R.drawable.stat_notify_call_mute, "Snooze 5m", snooze5mIntent)
+                    Notification.Action.Builder(
+                        android.R.drawable.stat_notify_call_mute,
+                        "Snooze 5m",
+                        snooze5mIntent
+                    )
                         .setSemanticAction(Notification.Action.SEMANTIC_ACTION_MUTE)
-                        .build())
+                        .build()
+                )
         notificationManager.notify(notificationID, notificationBuilder.build())
     }
 
@@ -145,7 +189,8 @@ class NotificationListener : NotificationListenerService() {
         log("extras: ${bundleToString(intent?.extras)}")
         val action = intent?.getStringExtra("action") ?: return START_NOT_STICKY
         val label = intent.getStringExtra("label") ?: return START_NOT_STICKY
-        val originalNotificationKey = intent.getStringExtra("originalNotificationKey") ?: return START_NOT_STICKY
+        val originalNotificationKey =
+            intent.getStringExtra("originalNotificationKey") ?: return START_NOT_STICKY
 
         if (action == "show") {
             showNotification(label, originalNotificationKey)
@@ -156,27 +201,50 @@ class NotificationListener : NotificationListenerService() {
         if (notificationID < 0) return START_NOT_STICKY
 
         when (action) {
-            "stop" -> { dismiss(notificationID, originalNotificationKey) }
-            "snooze1m", "snooze5m" -> { snooze(action, label, notificationID, originalNotificationKey) }
-            else -> { Log.e("AMI","Unknown action: $action!") }
+            "stop" -> {
+                dismiss(notificationID, originalNotificationKey)
+            }
+
+            "snooze1m", "snooze5m" -> {
+                snooze(action, label, notificationID, originalNotificationKey)
+            }
+
+            else -> {
+                Log.e("AMI", "Unknown action: $action!")
+            }
         }
         return START_NOT_STICKY
 
     }
 
     @SuppressLint("ScheduleExactAlarm")
-    private fun setExactAlarm(alarmManager: AlarmManager, aci: AlarmManager.AlarmClockInfo, pendingIntent: PendingIntent) {
+    private fun setExactAlarm(
+        alarmManager: AlarmManager,
+        aci: AlarmManager.AlarmClockInfo,
+        pendingIntent: PendingIntent
+    ) {
         alarmManager.setAlarmClock(aci, pendingIntent)
     }
 
-    private fun snooze(action: String, label: String, notificationID: Int, originalNotificationKey: String) {
+    private fun snooze(
+        action: String,
+        label: String,
+        notificationID: Int,
+        originalNotificationKey: String
+    ) {
         log("snooze: $action $label $notificationID")
         val durStr = action.removePrefix("snooze")
-        if (durStr == action) { Log.wtf("AMI", "Missing prefix 'snooze' in $action") }
+        if (durStr == action) {
+            Log.wtf("AMI", "Missing prefix 'snooze' in $action")
+        }
         val minutesStr = durStr.removeSuffix("m")
-        if (minutesStr == durStr) { Log.wtf("AMI", "Missing suffix 'm' in $action") }
+        if (minutesStr == durStr) {
+            Log.wtf("AMI", "Missing suffix 'm' in $action")
+        }
         val minutes = minutesStr.toInt()
-        if (minutes != 5 && minutes != 1) { Log.wtf("AMI", "Unexpected snooze duration of $minutes in $action") }
+        if (minutes != 5 && minutes != 1) {
+            Log.wtf("AMI", "Unexpected snooze duration of $minutes in $action")
+        }
 
         dismiss(notificationID, "")
 
@@ -185,8 +253,14 @@ class NotificationListener : NotificationListenerService() {
         intent.putExtra("action", "show")
         intent.putExtra("label", label)
         intent.putExtra("originalNotificationKey", originalNotificationKey)
-        val pendingIntent = PendingIntent.getService(this, 4, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val aci = AlarmManager.AlarmClockInfo(System.currentTimeMillis() + 60*1000*minutes, null)
+        val pendingIntent = PendingIntent.getService(
+            this,
+            4,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val aci =
+            AlarmManager.AlarmClockInfo(System.currentTimeMillis() + 60 * 1000 * minutes, null)
         log("snoozed for $minutes minutes")
         setExactAlarm(alarmManager, aci, pendingIntent)
     }

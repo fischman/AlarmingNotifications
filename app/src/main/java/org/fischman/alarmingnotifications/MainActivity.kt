@@ -14,7 +14,9 @@ import android.util.Log
 
 class MainActivity : Activity() {
     private val debug = false
-    private fun log(msg: String) { if (debug) Log.e("AMI", msg) }
+    private fun log(msg: String) {
+        if (debug) Log.e("AMI", msg)
+    }
 
     override fun onResume() {
         super.onResume()
@@ -41,8 +43,10 @@ class MainActivity : Activity() {
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
             if (!alarmManager.canScheduleExactAlarms()) {
                 log("Not already allowed to schedule exact alarms, launching settings")
-                alert("Permission to set exact alarms",
-                    "Please grant the \"Alarms & reminders\" permission for ${resources.getString(R.string.app_name)} to enable snooze functionality.") {
+                alert(
+                    "Permission to set exact alarms",
+                    "Please grant the \"Alarms & reminders\" permission for ${resources.getString(R.string.app_name)} to enable snooze functionality."
+                ) {
                     startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
                     finish()
                 }
@@ -52,11 +56,19 @@ class MainActivity : Activity() {
             }
         }
 
-        if (!Settings.Secure.getString(contentResolver,"enabled_notification_listeners").contains(
-                "$packageName/$packageName.NotificationListener")) {
+        if (!Settings.Secure.getString(contentResolver, "enabled_notification_listeners").contains(
+                "$packageName/$packageName.NotificationListener"
+            )
+        ) {
             log("Not already listening for notifications, launching settings")
-            alert("Permission to Read Notifications",
-                "Please grant the \"Device & app notifications\" permission for ${resources.getString(R.string.app_name)} and then restart the app.") {
+            alert(
+                "Permission to Read Notifications",
+                "Please grant the \"Device & app notifications\" permission for ${
+                    resources.getString(
+                        R.string.app_name
+                    )
+                } and then restart the app."
+            ) {
                 startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                 finish()
             }
@@ -65,18 +77,52 @@ class MainActivity : Activity() {
             log("Already listening for notifications, yay")
         }
 
-        alert("Yay", "All permissions granted, now awaiting notifications.\nFeel free to dismiss this app now, notifications will be watched in the background.") { finish() }
+        val permissionsYay = "All permissions granted, now awaiting notifications.\n" +
+            "Feel free to dismiss this app now, notifications will be watched in the background."
+        val mutedUntilStr = mutedUntil(this)
+        var maybeMuted = ""
+        if (mutedUntilStr != "") {
+            maybeMuted = "Currently muted until $mutedUntilStr\n"
+        }
+        var otherButton = "Mute for 1h"
+        var onOtherButton = { muteForOneHour(this); val intent = this.intent; this.finish(); this.startActivity(intent) }
+        if (maybeMuted != "") {
+            maybeMuted = "\n\n$maybeMuted"
+            otherButton = "Unmute"
+            onOtherButton = { unmute(this); val intent = this.intent; this.finish(); this.startActivity(intent) }
+        }
+        alert2(
+            "Yay",
+            "$permissionsYay$maybeMuted",
+            { this.finish() },
+            otherButton, onOtherButton,
+            { val intent = this.intent; this.finish(); this.startActivity(intent) },
+            { this.finish() }
+        )
     }
 
     private fun alert(title: String, msg: String, onOK: () -> Unit) {
-        AlertDialog.Builder(this@MainActivity)
+        alert2(title, msg, onOK, null, null, {}, {})
+    }
+
+    private fun alert2(title: String, msg: String, onOK: () -> Unit,
+                       otherButtonLabel: String?, onOtherButton: (() -> Unit)?,
+                       restart: ()->Unit, onCancel: ()->Unit) {
+        val builder = AlertDialog.Builder(this@MainActivity)
             .setTitle(title)
             .setMessage(msg)
             .setPositiveButton("OK") { dialog, _ ->
                 dialog.dismiss()
                 onOK()
             }
-            .create()
-            .show()
+            .setOnCancelListener() { dialog -> onCancel() }
+        if (otherButtonLabel != null) {
+            builder.setNeutralButton(otherButtonLabel ?: "") { dialog, _ ->
+                dialog.dismiss()
+                onOtherButton?.invoke()
+                restart()
+            }
+        }
+        builder.create().show()
     }
 }
