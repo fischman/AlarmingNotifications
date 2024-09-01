@@ -115,7 +115,10 @@ class MainActivity : Activity() {
                 dialog.dismiss()
                 onOK()
             }
-            .setOnCancelListener() { dialog -> onCancel() }
+            .setOnCancelListener() { dialog ->
+                dialog.dismiss()
+                onCancel()
+            }
         if (otherButtonLabel != null) {
             builder.setNeutralButton(otherButtonLabel ?: "") { dialog, _ ->
                 dialog.dismiss()

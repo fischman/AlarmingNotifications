@@ -19,7 +19,7 @@ import kotlin.random.Random
 
 
 class NotificationListener : NotificationListenerService() {
-    private val debug = true
+    private val debug = false
     private fun log(msg: String) {
         if (debug) println(msg)
     }
