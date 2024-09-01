@@ -78,7 +78,10 @@ class NotificationListener : NotificationListenerService() {
         // Ignore all-day events with this one weird trick! Unfortunately doesn't seem to be any
         // other indication of all-day nature of an event other than this text (and absence of a
         // time-window instead).
-        if (notification.extras.getString(Notification.EXTRA_TEXT) == "Tomorrow") return
+        if (extraText == "Tomorrow") return
+
+        // Ignore notifications for events that start after 2am tomorrow.
+        if (extraText?.contains("Tomorrow, (0[2-9]|1|2)".toRegex()) == true) return
 
         val label = ((tickerText ?: "") + "\n" + (extraText ?: "") + "\n" + (titleText ?: "")).trim()
         log("onNotificationPosted: $label")
