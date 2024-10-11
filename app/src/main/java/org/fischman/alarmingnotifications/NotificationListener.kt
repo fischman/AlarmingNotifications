@@ -25,6 +25,7 @@ class NotificationListener : NotificationListenerService() {
     }
 
     private val mp = MediaPlayer()
+    private var originalNotificationKeyToAlarmingID: MutableMap<String, Int> = mutableMapOf()
 
     override fun onListenerConnected() = log("onListenerConnected")
     override fun onListenerDisconnected() = log("onListenerDisconnected")
@@ -40,6 +41,20 @@ class NotificationListener : NotificationListenerService() {
         mp.isLooping = true
     }
 
+    private fun isInteresting(sbn: StatusBarNotification): Boolean {
+        return (
+            // (debug && sbn.packageName == "com.google.android.gm") || // Debug using Gmail chat notifications.
+            sbn.packageName == "com.google.android.calendar"
+        )
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        if (!isInteresting(sbn)) {
+            return
+        }
+        originalNotificationKeyToAlarmingID[sbn.key]?.let { dismiss(it, sbn.key) }
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val mutedUntilStr = mutedUntil(this)
         if (mutedUntilStr != "") {
@@ -47,10 +62,7 @@ class NotificationListener : NotificationListenerService() {
             return
         }
 
-        val interesting =
-            // (debug && sbn.packageName == "com.google.android.gm") || // Debug using Gmail chat notifications.
-            sbn.packageName == "com.google.android.calendar"
-        if (!interesting) {
+        if (!isInteresting(sbn)) {
             return
         }
 
@@ -129,6 +141,8 @@ class NotificationListener : NotificationListenerService() {
         mp.start()
 
         val notificationID = Random.nextInt(0, 999999)
+        originalNotificationKeyToAlarmingID[originalNotificationKey] = notificationID
+
         val stopIntent =
             createPendingIntent(0, "stop", notificationID, label, originalNotificationKey)
         val snooze1mIntent =
@@ -267,6 +281,7 @@ class NotificationListener : NotificationListenerService() {
 
     private fun dismiss(notificationID: Int, originalNotificationKey: String) {
         log("dismiss: notificationID: $notificationID")
+        originalNotificationKeyToAlarmingID.remove(originalNotificationKey)
         if (mp.isPlaying) mp.stop()
         getSystemService(NotificationManager::class.java).cancel(notificationID)
 
