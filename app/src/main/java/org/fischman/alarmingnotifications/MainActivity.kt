@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.CalendarContract
 import android.provider.Settings
 import android.util.Log
 
@@ -124,6 +125,21 @@ class MainActivity : Activity() {
                 dialog.dismiss()
                 onOtherButton?.invoke()
                 restart()
+            }
+            if (debug) {
+                builder.setNegativeButton("Create\nTest\nEvent") { dialog, _ ->
+                    dialog.dismiss()
+                    startActivity(
+                        Intent(Intent.ACTION_INSERT)
+                            .setData(CalendarContract.Events.CONTENT_URI)
+                            .putExtra(
+                                CalendarContract.EXTRA_EVENT_BEGIN_TIME,
+                                System.currentTimeMillis() + 30000
+                            )
+                            .putExtra(CalendarContract.Events.TITLE, "Test")
+                    )
+                    restart()
+                }
             }
         }
         builder.create().show()

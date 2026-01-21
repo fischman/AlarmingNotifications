@@ -7,7 +7,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.media.AudioManager
+import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
@@ -36,13 +36,17 @@ class NotificationListener : NotificationListenerService() {
             applicationContext,
             RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
         )
-        @Suppress("DEPRECATION")
-        mp.setAudioStreamType(AudioManager.STREAM_ALARM)
+        mp.setAudioAttributes(AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+            .build())
         mp.isLooping = true
     }
 
     private fun isInteresting(sbn: StatusBarNotification): Boolean {
-        return (
+        return sbn.notification.channelId != "TASKS" &&
+                !sbn.key.contains("Aggregate_AlertingSection") &&
+                !originalNotificationKeyToAlarmingID.contains(sbn.key) && (
             // (debug && sbn.packageName == "com.google.android.gm") || // Debug using Gmail chat notifications.
             sbn.packageName == "com.google.android.calendar"
         )
@@ -83,14 +87,14 @@ class NotificationListener : NotificationListenerService() {
             }
             val textContents = "${sbn.notification.tickerText}\n${
                 textFields.joinToString(separator = "\n") { fieldName: String ->
-                    "$fieldName - ${sbn.notification.extras.getString(fieldName)}"
+                    "$fieldName - ${sbn.notification.extras.get(fieldName)?.toString()}"
                 }
             }"
             log("All text-related fields from notification: $textContents")
             log("Full notification: $sbn")
             log("and extras: ")
             for (key in sbn.notification.extras.keySet()) {
-                log("key:" + key + ", value: " + sbn.notification.extras.getString(key))
+                log("key:" + key + ", value: " + sbn.notification.extras.get(key)?.toString())
             }
         }
 
@@ -137,8 +141,10 @@ class NotificationListener : NotificationListenerService() {
 
     @Suppress("DEPRECATION")
     private fun showNotification(label: String, originalNotificationKey: String) {
-        mp.prepare()
-        mp.start()
+        if (!mp.isPlaying) {
+            mp.prepare()
+            mp.start()
+        }
 
         val notificationID = Random.nextInt(0, 999999)
         originalNotificationKeyToAlarmingID[originalNotificationKey] = notificationID
