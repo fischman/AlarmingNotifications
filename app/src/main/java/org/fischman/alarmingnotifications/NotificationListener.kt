@@ -44,9 +44,15 @@ class NotificationListener : NotificationListenerService() {
     }
 
     private fun isInteresting(sbn: StatusBarNotification): Boolean {
-        return sbn.notification.channelId != "TASKS" &&
-                !sbn.key.contains("Aggregate_AlertingSection") &&
-                !originalNotificationKeyToAlarmingID.contains(sbn.key) && (
+        // Ignore Keep Reminders, now surfaced as Tasks notifications from
+        // Calendar (when Tasks app isn't installed).
+        if (sbn.notification.actions?.any {
+                it.title == "Open note" && it.getIcon() != null
+            } ?: false) {
+            return false
+        }
+
+        return !originalNotificationKeyToAlarmingID.contains(sbn.key) && (
             // (debug && sbn.packageName == "com.google.android.gm") || // Debug using Gmail chat notifications.
             sbn.packageName == "com.google.android.calendar"
         )
