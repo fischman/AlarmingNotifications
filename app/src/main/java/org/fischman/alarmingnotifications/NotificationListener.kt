@@ -59,9 +59,6 @@ class NotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        if (!isInteresting(sbn)) {
-            return
-        }
         originalNotificationKeyToAlarmingID[sbn.key]?.let { dismiss(it, sbn.key) }
     }
 
