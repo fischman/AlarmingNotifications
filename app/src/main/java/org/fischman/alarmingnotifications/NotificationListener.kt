@@ -43,12 +43,34 @@ class NotificationListener : NotificationListenerService() {
         mp.isLooping = true
     }
 
+    private fun extractText(sbn: StatusBarNotification): List<CharSequence> {
+        val extras = sbn.notification.extras
+        return (listOfNotNull(
+            extras.getCharSequence(Notification.EXTRA_TITLE),
+            extras.getCharSequence(Notification.EXTRA_TEXT),
+            extras.getCharSequence(Notification.EXTRA_BIG_TEXT),
+            extras.getCharSequence(Notification.EXTRA_SUB_TEXT),
+            extras.getCharSequence(Notification.EXTRA_INFO_TEXT),
+            extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT),
+        ) + (if (Build.VERSION.SDK_INT >= 33)
+            extras.getParcelableArray(Notification.EXTRA_MESSAGES, Bundle::class.java)
+        else
+            @Suppress("DEPRECATION") extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+                )?.mapNotNull { (it as? Bundle)?.getCharSequence("text") }.orEmpty()
+        ).filter { it.any(Char::isLetterOrDigit) }
+    }
+
     private fun isInteresting(sbn: StatusBarNotification): Boolean {
         // Ignore Keep Reminders, now surfaced as Tasks notifications from
         // Calendar (when Tasks app isn't installed).
         if (sbn.notification.actions?.any {
                 it.title == "Open note" && it.getIcon() != null
             } ?: false) {
+            return false
+        }
+
+        // https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html#ubc
+        if (extractText(sbn).any { it.toString().trim().contains(Regex("/s(\\P{L}|$)")) }) {
             return false
         }
 
