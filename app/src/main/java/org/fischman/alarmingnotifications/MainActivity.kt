@@ -10,7 +10,14 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.CalendarContract
 import android.provider.Settings
+import android.text.InputType
 import android.util.Log
+import android.view.Gravity
+import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
 
 
 class MainActivity : Activity() {
@@ -81,9 +88,13 @@ class MainActivity : Activity() {
         val permissionsYay = "All permissions granted, now awaiting notifications.\n" +
             "Feel free to dismiss this app now, notifications will be watched in the background."
         val mutedUntilStr = mutedUntil(this)
+        val muteCount = muteCountRemaining(this)
         var maybeMuted = ""
         if (mutedUntilStr != "") {
             maybeMuted = "Currently muted until $mutedUntilStr\n"
+        }
+        if (muteCount > 0) {
+            maybeMuted += "Muted for $muteCount more notification(s)\n"
         }
         var otherButton = "Mute for 1h"
         var onOtherButton = { muteForOneHour(this); val intent = this.intent; this.finish(); this.startActivity(intent) }
@@ -92,14 +103,65 @@ class MainActivity : Activity() {
             otherButton = "Unmute"
             onOtherButton = { unmute(this); val intent = this.intent; this.finish(); this.startActivity(intent) }
         }
+        val restart = { val intent = this.intent; this.finish(); this.startActivity(intent) }
+        val muteForNView = buildMuteForNView(restart)
         alert2(
             "Yay",
             "$permissionsYay$maybeMuted",
             { this.finish() },
             otherButton, onOtherButton,
-            { val intent = this.intent; this.finish(); this.startActivity(intent) },
-            { this.finish() }
+            restart,
+            { this.finish() },
+            muteForNView
         )
+    }
+
+    private fun buildMuteForNView(restart: () -> Unit): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(48, 24, 48, 0)
+        }
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText("1")
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        row.addView(Button(this).apply {
+            text = "\u2212" // minus sign
+            setOnClickListener {
+                val cur = input.text.toString().toIntOrNull() ?: 1
+                if (cur > 1) input.setText((cur - 1).toString())
+            }
+        })
+        row.addView(input)
+        row.addView(Button(this).apply {
+            text = "+"
+            setOnClickListener {
+                val cur = input.text.toString().toIntOrNull() ?: 0
+                input.setText((cur + 1).toString())
+            }
+        })
+        row.addView(Button(this).apply {
+            text = "Mute"
+            setOnClickListener {
+                val n = input.text.toString().toIntOrNull() ?: 1
+                if (n > 0) {
+                    muteForNNotifications(this@MainActivity, n)
+                    restart()
+                }
+            }
+        })
+
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(TextView(this@MainActivity).apply {
+                text = "Mute for N notifications:"
+                setPadding(48, 16, 48, 0)
+            })
+            addView(row)
+        }
     }
 
     private fun alert(title: String, msg: String, onOK: () -> Unit) {
@@ -108,10 +170,10 @@ class MainActivity : Activity() {
 
     private fun alert2(title: String, msg: String, onOK: () -> Unit,
                        otherButtonLabel: String?, onOtherButton: (() -> Unit)?,
-                       restart: ()->Unit, onCancel: ()->Unit) {
+                       restart: ()->Unit, onCancel: ()->Unit,
+                       customView: View? = null) {
         val builder = AlertDialog.Builder(this@MainActivity)
             .setTitle(title)
-            .setMessage(msg)
             .setPositiveButton("OK") { dialog, _ ->
                 dialog.dismiss()
                 onOK()
@@ -120,6 +182,21 @@ class MainActivity : Activity() {
                 dialog.dismiss()
                 onCancel()
             }
+        if (customView != null) {
+            // Wrap the message text and custom view together, since
+            // AlertDialog.setMessage and setView don't coexist reliably.
+            val wrapper = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(this@MainActivity).apply {
+                    text = msg
+                    setPadding(48, 32, 48, 0)
+                })
+                addView(customView)
+            }
+            builder.setView(wrapper)
+        } else {
+            builder.setMessage(msg)
+        }
         if (otherButtonLabel != null) {
             builder.setNeutralButton(otherButtonLabel ?: "") { dialog, _ ->
                 dialog.dismiss()

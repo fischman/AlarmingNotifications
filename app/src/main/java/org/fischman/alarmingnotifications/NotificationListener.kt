@@ -141,6 +141,17 @@ class NotificationListener : NotificationListenerService() {
         val label =
             ((tickerText ?: "") + "\n" + (extraText ?: "") + "\n" + (titleText ?: "")).trim()
         log("onNotificationPosted: $label")
+
+        // Count-mute is checked here (late), unlike time-mute (early), because the
+        // countdown should only decrement for notifications that would have actually
+        // triggered an alarm — i.e. after isInteresting and text-content filtering.
+        if (decrementMuteCount(this)) {
+            val remaining = muteCountRemaining(this)
+            originalNotificationKeyToAlarmingID[sbn.key] = -1 // Suppress future iterations of this notification, too.
+            log("Suppressing notification because muted for $remaining more notification(s)")
+            return
+        }
+
         showNotification(label, sbn.key)
     }
 
