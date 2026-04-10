@@ -19,3 +19,8 @@
 local.properties
 /.idea/AndroidProjectSystem.xml
 /.idea/gradle.xml
+/keystores
+/.android
+/.kotlin
+/android-sdk
+/.local
