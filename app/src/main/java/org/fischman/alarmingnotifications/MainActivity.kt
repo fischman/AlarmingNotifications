@@ -14,7 +14,7 @@ import android.util.Log
 
 
 class MainActivity : Activity() {
-    private val debug = false
+    private val debug = BuildConfig.DEBUG
     private fun log(msg: String) {
         if (debug) Log.e("AMI", msg)
     }
