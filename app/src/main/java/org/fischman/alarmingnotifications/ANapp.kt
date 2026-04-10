@@ -11,16 +11,41 @@ const val notificationChannelID = "AlarmingNotifications-ChannelID"
 private const val muteDeadlineKey = "org.fischman.alarmingnotifications.muteDeadline"
 private const val muteCountKey = "org.fischman.alarmingnotifications.muteCount"
 
-fun muteForOneHour(context: Context) {
-    val deadline = LocalDateTime.now().plusHours(1).toString()
+fun muteForHours(context: Context, hours: Int) {
+    if (hours <= 0) {
+        unmuteTime(context)
+        return
+    }
+    val deadline = LocalDateTime.now().plusHours(hours.toLong()).toString()
     PreferenceManager.getDefaultSharedPreferences(context).edit().putString(muteDeadlineKey, deadline).apply()
 }
 
+fun muteForMinutes(context: Context, minutes: Int) {
+    if (minutes <= 0) {
+        unmuteTime(context)
+        return
+    }
+    val deadline = LocalDateTime.now().plusMinutes(minutes.toLong()).toString()
+    PreferenceManager.getDefaultSharedPreferences(context).edit().putString(muteDeadlineKey, deadline).apply()
+}
+
+fun unmuteTime(context: Context) {
+    PreferenceManager.getDefaultSharedPreferences(context).edit().remove(muteDeadlineKey).apply()
+}
+
+fun unmuteCount(context: Context) {
+    PreferenceManager.getDefaultSharedPreferences(context).edit().remove(muteCountKey).apply()
+}
+
 fun muteForNNotifications(context: Context, n: Int) {
+    if (n <= 0) {
+        unmuteCount(context)
+        return
+    }
     PreferenceManager.getDefaultSharedPreferences(context).edit().putInt(muteCountKey, n).apply()
 }
 
-fun unmute(context: Context) {
+fun unmuteAll(context: Context) {
     PreferenceManager.getDefaultSharedPreferences(context).edit().remove(muteDeadlineKey).remove(muteCountKey).apply()
 }
 
