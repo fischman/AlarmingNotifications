@@ -19,11 +19,6 @@ import kotlin.random.Random
 
 
 class NotificationListener : NotificationListenerService() {
-    private val debug = BuildConfig.DEBUG
-    private fun log(msg: String) {
-        if (debug) println(msg)
-    }
-
     private val mp = MediaPlayer()
     private var originalNotificationKeyToAlarmingID: MutableMap<String, Int> = mutableMapOf()
 
@@ -112,6 +107,7 @@ class NotificationListener : NotificationListenerService() {
             }
             val textContents = "${sbn.notification.tickerText}\n${
                 textFields.joinToString(separator = "\n") { fieldName: String ->
+                    @Suppress("DEPRECATION")
                     "$fieldName - ${sbn.notification.extras.get(fieldName)?.toString()}"
                 }
             }"
@@ -119,6 +115,7 @@ class NotificationListener : NotificationListenerService() {
             log("Full notification: $sbn")
             log("and extras: ")
             for (key in sbn.notification.extras.keySet()) {
+                @Suppress("DEPRECATION")
                 log("key:" + key + ", value: " + sbn.notification.extras.get(key)?.toString())
             }
         }

@@ -4,12 +4,21 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.preference.PreferenceManager
+import android.content.SharedPreferences
 import java.time.LocalDateTime
 
+private const val packageName = "org.fischman.alarmingnotifications"
 const val notificationChannelID = "AlarmingNotifications-ChannelID"
-private const val muteDeadlineKey = "org.fischman.alarmingnotifications.muteDeadline"
-private const val muteCountKey = "org.fischman.alarmingnotifications.muteCount"
+const val muteDeadlineKey = packageName + ".muteDeadline"
+const val muteCountKey = packageName + ".muteCount"
+
+fun log(msg: String) {
+    if (BuildConfig.DEBUG) println(msg)
+}
+
+fun getSharedPreferences(context: Context): SharedPreferences {
+    return context.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE)
+}
 
 fun muteForHours(context: Context, hours: Int) {
     if (hours <= 0) {
@@ -17,7 +26,7 @@ fun muteForHours(context: Context, hours: Int) {
         return
     }
     val deadline = LocalDateTime.now().plusHours(hours.toLong()).toString()
-    PreferenceManager.getDefaultSharedPreferences(context).edit().putString(muteDeadlineKey, deadline).apply()
+    getSharedPreferences(context).edit().putString(muteDeadlineKey, deadline).apply()
 }
 
 fun muteForMinutes(context: Context, minutes: Int) {
@@ -26,15 +35,15 @@ fun muteForMinutes(context: Context, minutes: Int) {
         return
     }
     val deadline = LocalDateTime.now().plusMinutes(minutes.toLong()).toString()
-    PreferenceManager.getDefaultSharedPreferences(context).edit().putString(muteDeadlineKey, deadline).apply()
+    getSharedPreferences(context).edit().putString(muteDeadlineKey, deadline).apply()
 }
 
 fun unmuteTime(context: Context) {
-    PreferenceManager.getDefaultSharedPreferences(context).edit().remove(muteDeadlineKey).apply()
+    getSharedPreferences(context).edit().remove(muteDeadlineKey).apply()
 }
 
 fun unmuteCount(context: Context) {
-    PreferenceManager.getDefaultSharedPreferences(context).edit().remove(muteCountKey).apply()
+    getSharedPreferences(context).edit().remove(muteCountKey).apply()
 }
 
 fun muteForNNotifications(context: Context, n: Int) {
@@ -42,16 +51,16 @@ fun muteForNNotifications(context: Context, n: Int) {
         unmuteCount(context)
         return
     }
-    PreferenceManager.getDefaultSharedPreferences(context).edit().putInt(muteCountKey, n).apply()
+    getSharedPreferences(context).edit().putInt(muteCountKey, n).apply()
 }
 
 fun unmuteAll(context: Context) {
-    PreferenceManager.getDefaultSharedPreferences(context).edit().remove(muteDeadlineKey).remove(muteCountKey).apply()
+    getSharedPreferences(context).edit().remove(muteDeadlineKey).remove(muteCountKey).apply()
 }
 
 /** Returns the remaining mute-by-count, or 0 if not count-muted. */
 fun muteCountRemaining(context: Context): Int {
-    return PreferenceManager.getDefaultSharedPreferences(context).getInt(muteCountKey, 0)
+    return getSharedPreferences(context).getInt(muteCountKey, 0)
 }
 
 /**
@@ -59,7 +68,7 @@ fun muteCountRemaining(context: Context): Int {
  * When the count reaches 0 the mute is cleared and false is returned ("not muted, fire alarm").
  */
 fun decrementMuteCount(context: Context): Boolean {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+    val prefs = getSharedPreferences(context)
     val remaining = prefs.getInt(muteCountKey, 0)
     if (remaining <= 0) return false
     val newVal = remaining - 1
@@ -72,7 +81,7 @@ fun decrementMuteCount(context: Context): Boolean {
 }
 
 fun mutedUntil(context: Context): String {
-    val existingDeadline = PreferenceManager.getDefaultSharedPreferences(context).getString(muteDeadlineKey, null) ?: return ""
+    val existingDeadline = getSharedPreferences(context).getString(muteDeadlineKey, null) ?: return ""
     if (existingDeadline <= LocalDateTime.now().toString()) { return "" }
     val parsedDeadline = LocalDateTime.parse(existingDeadline)
     return parsedDeadline.toString()

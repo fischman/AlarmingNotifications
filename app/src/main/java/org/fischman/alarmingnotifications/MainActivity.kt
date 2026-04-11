@@ -11,7 +11,6 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
-import android.preference.PreferenceManager
 import android.provider.Settings
 import android.util.Log
 import android.util.TypedValue
@@ -26,15 +25,9 @@ import android.widget.TextView
 
 
 class MainActivity : Activity() {
-    private val debug = BuildConfig.DEBUG
-    private fun log(msg: String) {
-        if (debug) Log.e("AMI", msg)
-    }
-
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         // When mute settings change, refresh the UI
-        if (key == "org.fischman.alarmingnotifications.muteDeadline" || 
-            key == "org.fischman.alarmingnotifications.muteCount") {
+        if (key == muteDeadlineKey || key == muteCountKey) {
             runOnUiThread {
                 if (hasAllPermissions()) {
                     setContentView(buildMainUI())
@@ -47,8 +40,7 @@ class MainActivity : Activity() {
         super.onResume()
         
         // Register preferences listener to auto-update UI when mutes change
-        @Suppress("DEPRECATION")
-        PreferenceManager.getDefaultSharedPreferences(this).registerOnSharedPreferenceChangeListener(prefsListener)
+        getSharedPreferences(this).registerOnSharedPreferenceChangeListener(prefsListener)
 
         if (Build.VERSION.SDK_INT >= 33) {
             when (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)) {
@@ -113,8 +105,7 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         // Unregister listener to avoid leaks
-        @Suppress("DEPRECATION")
-        PreferenceManager.getDefaultSharedPreferences(this).unregisterOnSharedPreferenceChangeListener(prefsListener)
+        getSharedPreferences(this).unregisterOnSharedPreferenceChangeListener(prefsListener)
     }
 
     private fun hasAllPermissions(): Boolean {
@@ -329,13 +320,12 @@ class MainActivity : Activity() {
     private fun buildQuickMuteSection(restart: () -> Unit): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            val lp = LinearLayout.LayoutParams(
+            layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-            lp.setMargins(0, 0, 0, dp(24))
-            layoutParams = lp
-
+            ).apply {
+                setMargins(0, 0, 0, dp(24))
+            }
             addView(TextView(this@MainActivity).apply {
                 text = "Quick Mute"
                 textSize = 15f
@@ -347,12 +337,12 @@ class MainActivity : Activity() {
             // Time quick buttons: 15m, 30m, 1h, 2h
             addView(LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
-                val lp = LinearLayout.LayoutParams(
+                layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-                lp.setMargins(0, 0, 0, dp(8))
-                layoutParams = lp
+                ).apply {
+                    setMargins(0, 0, 0, dp(8))
+                }
 
                 addView(createQuickButton("15m") { muteForMinutes(this@MainActivity, 15); restart() })
                 addView(createQuickButton("30m") { muteForMinutes(this@MainActivity, 30); restart() })
