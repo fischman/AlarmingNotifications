@@ -59,15 +59,15 @@ mechanism of choice.
 
 ## Note to self: How to build a new release
 
-On an exe.dev VM or in a docker container:
-- `./.exe.dev/build-and-deploy.sh --release`
+On an exe.dev VM:
+- `./.headless/build-and-deploy.sh --release`
 
 In a local dev-containers/sojourn container:
 - `~/src/dev-containers/sojourn new rust AlarmingNotifications .` ("rust" is not load-bearing here)
-- `./.exe.dev/install-android-sdk.sh` (only needed once per container)
+- `./.headless/install-android-sdk.sh` (only needed once per container)
 - `./android-sdk/platform-tools/adb pair <IP>:<PORT>` (Developer Options -> Wireless debugging -> Pair device with pairing code; use that popup's port, which will be different to the "IP address & Port" in Wireless debugging!)
 - `./android-sdk/platform-tools/adb connect <IP>:<PORT>` (now use the Wireless debugging IP & Port, not pairing port!)
-- `./.exe.dev/build-and-deploy.sh --release`
+- `./.headless/build-and-deploy.sh --release`
 
 In Android Studio:
 - Build -> Generate Signed Bundle/APK -> APK
