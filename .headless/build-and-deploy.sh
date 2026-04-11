@@ -44,7 +44,7 @@ else
 fi
 
 echo "==> Building $TASK..."
-./gradlew "$TASK"
+./gradlew --warning-mode all -Dorg.gradle.deprecation.trace=true "$TASK"
 
 if $RELEASE; then
   [ -f "$KEYSTORE" ] || { echo "ERROR: Keystore not found: $KEYSTORE" >&2; exit 1; }
