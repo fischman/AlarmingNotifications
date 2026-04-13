@@ -406,13 +406,13 @@ class MainActivity : Activity() {
             val hoursPicker = NumberPicker(this@MainActivity).apply {
                 minValue = 0
                 maxValue = 24
-                value = 1
+                value = 0
             }
 
             val notifPicker = NumberPicker(this@MainActivity).apply {
                 minValue = 0
                 maxValue = 24
-                value = 5
+                value = 0
             }
 
             val hoursGroup = LinearLayout(this@MainActivity).apply {
@@ -458,7 +458,7 @@ class MainActivity : Activity() {
             addView(pickerRow)
 
             // Apply button
-            addView(Button(this@MainActivity).apply {
+            val applyButton = Button(this@MainActivity).apply {
                 text = "Apply Custom Mute"
                 textSize = 15f
                 background = GradientDrawable().apply {
@@ -468,6 +468,8 @@ class MainActivity : Activity() {
                 setTextColor(Color.WHITE)
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setPadding(0, dp(14), 0, dp(14))
+                isEnabled = false
+                alpha = 0.5f
                 setOnClickListener {
                     val hours = hoursPicker.value
                     val notifs = notifPicker.value
@@ -475,7 +477,15 @@ class MainActivity : Activity() {
                     muteForNNotifications(this@MainActivity, notifs)
                     restart()
                 }
-            })
+            }
+            val updateButtonState = NumberPicker.OnValueChangeListener { _, _, _ ->
+                val isActive = hoursPicker.value > 0 || notifPicker.value > 0
+                applyButton.isEnabled = isActive
+                applyButton.alpha = if (isActive) 1.0f else 0.5f
+            }
+            hoursPicker.setOnValueChangedListener(updateButtonState)
+            notifPicker.setOnValueChangedListener(updateButtonState)
+            addView(applyButton)
         }
     }
 
