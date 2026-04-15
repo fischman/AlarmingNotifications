@@ -342,27 +342,49 @@ class MainActivity : Activity() {
             addView(LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 addView(TextView(this@MainActivity).apply {
                     text = "✅ Yay"
                     textSize = 24f
                     setTextColor(Color.WHITE)
                     setTypeface(null, Typeface.BOLD)
-                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 })
 
                 addView(TextView(this@MainActivity).apply {
                     text = "?"
-                    textSize = 18f
+                    textSize = 10f
                     setTextColor(Color.WHITE)
-                    setPadding(dp(10), dp(4), dp(10), dp(4))
+                    setPadding(dp(5), dp(1), dp(5), dp(1))
                     background = GradientDrawable().apply {
                         setColor(Color.parseColor("#33000000"))
                         cornerRadius = dp(20).toFloat()
                     }
                     setOnClickListener { setContentView(buildPermissionSetupUI()) }
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        leftMargin = dp(4)
+                        gravity = Gravity.TOP
+                        topMargin = dp(4)
+                    }
+                })
+
+                addView(View(this@MainActivity).apply { layoutParams = LinearLayout.LayoutParams(0, 0, 1f) }) // Spacer.
+
+                addView(TextView(this@MainActivity).apply {
+                    text = "⚙"
+                    textSize = 22f
+                    setTextColor(Color.WHITE)
+                    setPadding(dp(8), dp(4), dp(8), dp(4))
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor("#33000000"))
+                        cornerRadius = dp(20).toFloat()
+                    }
+                    setOnClickListener {
+                        startActivity(android.content.Intent(this@MainActivity, SettingsActivity::class.java))
+                    }
                 })
             })
+
             addView(TextView(this@MainActivity).apply {
                 text = "All permissions granted, now awaiting notifications. Feel free to dismiss this app."
                 textSize = 13f

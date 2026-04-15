@@ -11,6 +11,10 @@ private const val packageName = "org.fischman.alarmingnotifications"
 const val notificationChannelID = "AlarmingNotifications-ChannelID"
 const val muteDeadlineKey = packageName + ".muteDeadline"
 const val muteCountKey = packageName + ".muteCount"
+const val ignoreKeepKey = packageName + ".ignoreKeep"
+const val ignoreSuffixKey = packageName + ".ignoreSuffix"
+const val alarmPackagesKey = packageName + ".alarmPackages"
+val defaultAlarmPackages = setOf("com.google.android.calendar")
 
 fun log(msg: String) {
     if (BuildConfig.DEBUG) println(msg)

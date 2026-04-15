@@ -56,23 +56,32 @@ class NotificationListener : NotificationListenerService() {
     }
 
     private fun isInteresting(sbn: StatusBarNotification): Boolean {
-        // Ignore Keep Reminders, now surfaced as Tasks notifications from
-        // Calendar (when Tasks app isn't installed).
-        if (sbn.notification.actions?.any {
-                it.title == "Open note" && it.getIcon() != null
-            } ?: false) {
-            return false
+        val prefs = getSharedPreferences(this)
+
+        // Ignore Keep Reminders, now surfaced as Tasks notifications from Calendar (when Tasks app isn't installed), unless disabled.
+        if (prefs.getBoolean(ignoreKeepKey, true)) {
+            if (sbn.notification.actions?.any {
+                    it.title == "Open note" && it.getIcon() != null
+                } ?: false) {
+                return false
+            }
         }
 
-        // https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html#ubc
-        if (extractText(sbn).any { it.toString().trim().contains(Regex("/s(\\P{L}|$)")) }) {
-            return false
+        // Ignore notifications whose text ends with the configured suffix
+        val suffix = prefs.getString(ignoreSuffixKey, "/s")!!
+        if (suffix.isNotEmpty()) {
+            // Match suffix at end of trimmed text, followed by non-letter or end
+            // https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html#ubc
+            val pattern = Regex(Regex.escape(suffix) + "(\\P{L}|$)")
+            if (extractText(sbn).any { it.toString().trim().contains(pattern) }) {
+                return false
+            }
         }
 
-        return !originalNotificationKeyToAlarmingID.contains(sbn.key) && (
-            // (debug && sbn.packageName == "com.google.android.gm") || // Debug using Gmail chat notifications.
-            sbn.packageName == "com.google.android.calendar"
-        )
+        val alarmPackages: Set<String> = prefs.getStringSet(alarmPackagesKey, defaultAlarmPackages)!!
+        if (!(sbn.packageName in alarmPackages)) return false
+
+        return !originalNotificationKeyToAlarmingID.contains(sbn.key)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
