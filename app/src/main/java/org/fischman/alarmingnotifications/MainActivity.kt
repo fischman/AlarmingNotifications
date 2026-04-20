@@ -458,7 +458,7 @@ class MainActivity : Activity() {
                 }
 
                 if (muteCount > 0) {
-                    addView(createMuteBadge("🔕 $muteCount notes") {
+                    addView(createMuteBadge("🔕 $muteCount notification${if (muteCount > 1) "s" else ""}") {
                         unmuteCount(this@MainActivity)
                         restart()
                     })
