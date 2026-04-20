@@ -37,8 +37,8 @@ yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
 # 4. Install platform-tools (adb), build-tools, and platform
 "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
   "platform-tools" \
-  "platforms;android-34" \
-  "build-tools;34.0.0"
+  "platforms;android-35" \
+  "build-tools;35.0.0"
 
 echo ""
 echo "Done. Add to your shell profile:"
