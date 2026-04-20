@@ -9,10 +9,11 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -23,8 +24,22 @@ import android.widget.NumberPicker
 import android.widget.ScrollView
 import android.widget.TextView
 
+private const val postNotificationsRequestCode = 1001
 
 class MainActivity : Activity() {
+    private enum class PermissionStep {
+        SendNotifications,
+        ReadNotifications,
+        SetExactAlarms,
+    }
+
+    private data class PermissionStatus(
+        val step: PermissionStep,
+        val label: String,
+        val reason: String,
+        val granted: Boolean,
+    )
+
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         // When mute settings change, refresh the UI
         if (key == muteDeadlineKey || key == muteCountKey) {
@@ -38,68 +53,15 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        
+
         // Register preferences listener to auto-update UI when mutes change
         getSharedPreferences(this).registerOnSharedPreferenceChangeListener(prefsListener)
 
-        if (Build.VERSION.SDK_INT >= 33) {
-            when (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)) {
-                PackageManager.PERMISSION_GRANTED -> {}
-                else -> {
-                    alert(
-                        "Permission to Send Notifications",
-                        "To work correctly, this app needs permission to send you notifications. Please allow this on the next screen."
-                    ) {
-                        requestPermissions(
-                            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                            0, // Request code is unused since we don't listen for rejections. But the platform requires this to be >=0.
-                        )
-                    }
-                    return
-                }
-            }
-        }
+        refreshUi()
+    }
 
-        if (Build.VERSION.SDK_INT >= 31) {
-            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            if (!alarmManager.canScheduleExactAlarms()) {
-                log("Not already allowed to schedule exact alarms, launching settings")
-                alert(
-                    "Permission to set exact alarms",
-                    "Please grant the \"Alarms & reminders\" permission for ${resources.getString(R.string.app_name)} to enable snooze functionality."
-                ) {
-                    startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                    finish()
-                }
-                return
-            } else {
-                log("Already listening for notifications, yay")
-            }
-        }
-
-        if (!Settings.Secure.getString(contentResolver, "enabled_notification_listeners").contains(
-                "$packageName/$packageName.NotificationListener"
-            )
-        ) {
-            log("Not already listening for notifications, launching settings")
-            alert(
-                "Permission to Read Notifications",
-                "Please grant the \"Device & app notifications\" permission for ${
-                    resources.getString(
-                        R.string.app_name
-                    )
-                } and then restart the app."
-            ) {
-                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                finish()
-            }
-            return
-        } else {
-            log("Already listening for notifications, yay")
-        }
-
-        // All permissions granted - show the main UI
-        setContentView(buildMainUI())
+    private fun refreshUi() {
+        setContentView(if (firstMissingPermission() != null) buildPermissionSetupUI() else buildMainUI())
     }
 
     override fun onPause() {
@@ -108,28 +70,252 @@ class MainActivity : Activity() {
         getSharedPreferences(this).unregisterOnSharedPreferenceChangeListener(prefsListener)
     }
 
-    private fun hasAllPermissions(): Boolean {
-        if (Build.VERSION.SDK_INT >= 33) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                return false
-            }
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == postNotificationsRequestCode) {
+            refreshUi()
         }
+    }
+
+    private fun notificationListenerSettingsIntent(): Intent {
+        return if (Build.VERSION.SDK_INT >= 30) {
+            Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).apply {
+                putExtra(
+                    Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
+                    android.content.ComponentName(
+                        packageName,
+                        "$packageName.NotificationListener",
+                    ).flattenToString(),
+                )
+            }
+        } else {
+            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+        }
+    }
+
+    private fun permissionStatuses(): List<PermissionStatus> {
+        val statuses = mutableListOf<PermissionStatus>()
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            statuses += PermissionStatus(
+                PermissionStep.SendNotifications,
+                "Send notifications",
+                "Required so the app can post alarms.",
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
+            )
+        }
+
+        statuses += PermissionStatus(
+            PermissionStep.ReadNotifications,
+            "Read notifications",
+            "Required so the app can detect eligible notifications from other apps.",
+            Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+                ?.contains("$packageName/$packageName.NotificationListener") == true
+        )
 
         if (Build.VERSION.SDK_INT >= 31) {
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            if (!alarmManager.canScheduleExactAlarms()) {
-                return false
+            statuses += PermissionStatus(
+                PermissionStep.SetExactAlarms,
+                "Set exact alarms",
+                "Required for reliable timing of snooze on an alarming notification.",
+                alarmManager.canScheduleExactAlarms(),
+            )
+        }
+
+        return statuses
+    }
+
+    private fun firstMissingPermission(): PermissionStatus? {
+        return permissionStatuses().firstOrNull { !it.granted }
+    }
+
+    private fun grantedPermissionSteps(): Set<PermissionStep> {
+        return permissionStatuses().filter { it.granted }.mapTo(mutableSetOf()) { it.step }
+    }
+
+    private fun requestNextMissingPermission() {
+        when (firstMissingPermission()?.step) {
+            PermissionStep.SendNotifications -> {
+                requestPermissions(
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    postNotificationsRequestCode,
+                )
+            }
+
+            PermissionStep.ReadNotifications -> {
+                startActivity(notificationListenerSettingsIntent())
+            }
+
+            PermissionStep.SetExactAlarms -> {
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.fromParts("package", packageName, null)
+                }
+                startActivity(intent)
+            }
+
+            null -> Unit
+        }
+    }
+
+    private fun hasAllPermissions(): Boolean {
+        return permissionStatuses().all { it.granted }
+    }
+
+    private fun buildPermissionSetupUI(): View {
+        val rootLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+            setBackgroundColor(Color.parseColor("#f8f9fb"))
+        }
+
+        rootLayout.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#263238"))
+            setPadding(dp(16), dp(20), dp(16), dp(20))
+
+            addView(TextView(this@MainActivity).apply {
+                text = "Permission setup"
+                textSize = 24f
+                setTextColor(Color.WHITE)
+                setTypeface(null, Typeface.BOLD)
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = "Grant the minimum access needed for alarm delivery, notification listening, and snooze support."
+                textSize = 15f
+                setTextColor(Color.WHITE)
+                alpha = 0.9f
+                setPadding(0, dp(6), 0, 0)
+            })
+        })
+
+        val scrollView = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+        }
+
+        val contentLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+
+        contentLayout.addView(buildPermissionStatusCard())
+
+        contentLayout.addView(Button(this).apply {
+            val nextPermission = firstMissingPermission()
+            text = if (nextPermission == null) "All set" else "Continue: ${nextPermission.label}"
+            textSize = 15f
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#4CAF50"))
+                cornerRadius = dp(10).toFloat()
+            }
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL // Center horizontally
+            }
+            setOnClickListener { if (hasAllPermissions()) { refreshUi() } else { requestNextMissingPermission() } }
+        })
+
+        scrollView.addView(contentLayout)
+        rootLayout.addView(scrollView)
+        return rootLayout
+    }
+
+    private fun buildPermissionStatusCard(): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                setColor(Color.YELLOW)
+                cornerRadius = dp(14).toFloat()
+            }
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            val lp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            lp.setMargins(0, 0, 0, dp(16))
+            layoutParams = lp
+
+            addView(TextView(this@MainActivity).apply {
+                text = "Required permissions:"
+                textSize = 16f
+                setTextColor(Color.BLACK) // parseColor("#263238"))
+                setTypeface(null, Typeface.BOLD)
+                setPadding(0, dp(4), 0, dp(12))
+            })
+
+            permissionStatuses().forEach { status ->
+                addView(buildPermissionStatusRow(status))
             }
         }
+    }
 
-        if (!Settings.Secure.getString(contentResolver, "enabled_notification_listeners").contains(
-                "$packageName/$packageName.NotificationListener"
+    private fun buildPermissionStatusRow(status: PermissionStatus): View {
+        val labelColor = if (status.granted) "#2e7d32" else "#000000"
+        val chipColor = if (status.granted) "#7df085" else "#f5989e"
+        val label = if (status.granted) "Granted" else "Needed"
+
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor(chipColor))
+                cornerRadius = dp(4).toFloat()
+            }
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            val lp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
             )
-        ) {
-            return false
-        }
+            lp.setMargins(0, 0, 0, dp(10))
+            layoutParams = lp
 
-        return true
+            addView(TextView(this@MainActivity).apply {
+                text = if (status.granted) "●" else "○"
+                textSize = 18f
+                setTextColor(Color.parseColor(labelColor))
+                setPadding(0, 0, dp(12), 0)
+            })
+
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+
+                addView(TextView(this@MainActivity).apply {
+                    text = status.label
+                    textSize = 15f
+                    setTextColor(Color.BLACK)
+                    setTypeface(null, Typeface.BOLD)
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = status.reason
+                    textSize = 12f
+                    setTextColor(Color.BLACK)
+                    setPadding(0, dp(3), 0, 0)
+                })
+            })
+
+            addView(TextView(this@MainActivity).apply {
+                text = label
+                textSize = 12f
+                setTextColor(Color.parseColor(labelColor))
+                setTypeface(null, Typeface.BOLD)
+            })
+        }
     }
 
     private fun buildMainUI(): View {
@@ -153,10 +339,29 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.parseColor("#4CAF50"))
             setPadding(dp(16), dp(20), dp(16), dp(20))
 
-            addView(TextView(this@MainActivity).apply {
-                text = "✅ Yay"
-                textSize = 24f
-                setTextColor(Color.WHITE)
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+
+                addView(TextView(this@MainActivity).apply {
+                    text = "✅ Yay"
+                    textSize = 24f
+                    setTextColor(Color.WHITE)
+                    setTypeface(null, Typeface.BOLD)
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                })
+
+                addView(TextView(this@MainActivity).apply {
+                    text = "?"
+                    textSize = 18f
+                    setTextColor(Color.WHITE)
+                    setPadding(dp(10), dp(4), dp(10), dp(4))
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor("#33000000"))
+                        cornerRadius = dp(20).toFloat()
+                    }
+                    setOnClickListener { setContentView(buildPermissionSetupUI()) }
+                })
             })
             addView(TextView(this@MainActivity).apply {
                 text = "All permissions granted, now awaiting notifications. Feel free to dismiss this app."
