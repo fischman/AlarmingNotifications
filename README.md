@@ -13,14 +13,17 @@ realized automatically promoting gcal's notifications to alarms would
 be much nicer.
 
 ## What it does
-Every notification on the phone is reviewed. If it came from Google
-Calendar and isn't a "Tomorrow" notification (i.e. for a full-day
-event), the phone-default Alarm ringtone will be played and a
+Every notification on the phone is reviewed. If it is "interesting",
+the phone-default Alarm ringtone will be played and a
 high-priority notification will display until its `Stop` button is
 tapped.
 
+"Interesting" by default means: came from Calendar, is not a full-day
+event, is not a Keep reminder automigrated to Tasks, and title doesn't
+end in `/s` (for "silent"). These can be changed in app Settings.
+
 ## How it works
-This "app" registers an [Android Notifications Listener Service](https://developer.android.com/reference/android/service/notification/NotificationListenerService)
+This app registers an [Android Notifications Listener Service](https://developer.android.com/reference/android/service/notification/NotificationListenerService)
 that gets notified of every notification the phone displays.  When a
 notification matches its criteria, it triggers a high-priority
 notification with (hopefully) enough text from the original
@@ -30,10 +33,10 @@ currently doing to make dismissing the ringtone easy.
 
 The above requires two permissions: the ability to read all
 notifications, and the ability to post notifications of its own. After
-installing, you'll have to grant these permissions using a
-not-very-intuitive UI (that might differ among Android vendors; I'm
-only testing on a Google Pixel device).  At least the "Read
-notifications" permission will show a scary consent screen.
+installing, you'll have to grant these permissions, and "Read
+notifications" permission at leaast will show a scary consent screen
+(that might differ among Android vendors; I'm only testing on a Google
+Pixel device).
 
 ## How to install
 This isn't (yet?) available in Google's Play app store.
@@ -42,28 +45,13 @@ Either build using Android Studio (or gradle) from source, or download
 the latest [release](https://github.com/fischman/AlarmingNotifications/releases) APK and install via adb or your side-loading
 mechanism of choice.
 
-
-## Potential future features
-- Allow the user to configure arbitrary matching rules for notifications to trigger alarms.
-- Make the alarm ringtone and volume configurable.
-
-## Features Not likely to be implemented
-- Add (silent) notifications of upcoming alarms. 
-  - Motivation: I've found myself missing Clock's Alarms' behavior of
-    showing notifications for Alarms that are scheduled for less than
-    2h away.
-  - Pitfall: for calendar it's easy to imagine how to implement this,
-    though it would require yet another permission. On the other hand
-    for alarming based on arbitrary notifications, it's less obvious
-    how to predict when an alarm (notification) will fire.
-
 ## Note to self: How to build a new release
 
 On an exe.dev VM:
 - `./.headless/build-and-deploy.sh --release`
 
 In a local dev-containers/sojourn container:
-- `~/src/dev-containers/sojourn new rust AlarmingNotifications . -v "${HOME}/keystores:/work/keystores"` ("rust" is not load-bearing here)
+- `sojourn new AlarmingNotifications . -v "${HOME}/keystores:/root/keystores"`
 - `./.headless/install-android-sdk.sh` (only needed once per container)
 - `./android-sdk/platform-tools/adb pair <IP>:<PORT>` (Developer Options -> Wireless debugging -> Pair device with pairing code; use that popup's port, which will be different to the "IP address & Port" in Wireless debugging!)
 - `./android-sdk/platform-tools/adb connect <IP>:<PORT>` (now use the Wireless debugging IP & Port, not pairing port!)
