@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = "org.fischman.alarmingnotifications"
-    compileSdk = 34
+    compileSdk = 35
 
     ndkVersion = "26.1.10909125" // Must match the version in ../.headless/install-android-sdk.sh !
 
     defaultConfig {
         applicationId = "org.fischman.alarmingnotifications"
         minSdk = 30
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
     }
