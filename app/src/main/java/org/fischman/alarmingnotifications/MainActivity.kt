@@ -115,13 +115,13 @@ internal fun PermissionSetupScreen(statuses: List<PermissionStatus>, onRefresh: 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF263238))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
                     .padding(16.dp, 20.dp)
             ) {
-                Text("Permission setup", fontSize = 24.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Permission setup", fontSize = 24.sp, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
                 Text(
                     "Grant the minimum access needed for alarm delivery, notification listening, and snooze support.",
-                    fontSize = 15.sp, color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 15.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
                     modifier = Modifier.padding(top = 6.dp)
                 )
             }
@@ -156,13 +156,11 @@ internal fun PermissionSetupScreen(statuses: List<PermissionStatus>, onRefresh: 
                                 null -> onRefresh()
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Text(
                             if (nextPermission == null) "All set" else "Continue: ${nextPermission.label}",
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
                         )
                     }
                 }
@@ -174,12 +172,12 @@ internal fun PermissionSetupScreen(statuses: List<PermissionStatus>, onRefresh: 
 @Composable
 internal fun PermissionStatusCard(statuses: List<PermissionStatus>) {
     Surface(
-        color = Color(0xFFFFEB3B),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Required permissions:", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+            Text("Required permissions:", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
             Spacer(modifier = Modifier.height(12.dp))
             statuses.forEach { status ->
                 PermissionStatusRow(status)
@@ -191,8 +189,8 @@ internal fun PermissionStatusCard(statuses: List<PermissionStatus>) {
 
 @Composable
 internal fun PermissionStatusRow(status: PermissionStatus) {
-    val labelColor = if (status.granted) Color(0xFF1B5E20) else Color.Black
-    val chipColor = if (status.granted) Color(0xFFA5D6A7) else Color(0xFFEF9A9A)
+    val chipColor = if (status.granted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
+    val contentColor = if (status.granted) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
 
     Row(
         modifier = Modifier
@@ -201,15 +199,15 @@ internal fun PermissionStatusRow(status: PermissionStatus) {
             .padding(14.dp, 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(if (status.granted) "●" else "○", fontSize = 18.sp, color = labelColor)
+        Text(if (status.granted) "●" else "○", fontSize = 18.sp, color = contentColor)
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(status.label, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-            Text(status.reason, fontSize = 12.sp, color = Color.Black)
+            Text(status.label, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = contentColor)
+            Text(status.reason, fontSize = 12.sp, color = contentColor)
         }
         Text(
             if (status.granted) "Granted" else "Needed",
-            fontSize = 12.sp, fontWeight = FontWeight.Bold, color = labelColor
+            fontSize = 12.sp, fontWeight = FontWeight.Bold, color = contentColor
         )
     }
 }
@@ -225,9 +223,9 @@ fun MainDashboard(
 
     Scaffold(
         topBar = {
-            Column(modifier = Modifier.background(Color(0xFF4CAF50)).padding(16.dp, 20.dp)) {
+            Column(modifier = Modifier.background(MaterialTheme.colorScheme.primary).padding(16.dp, 20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("✅ Yay", fontSize = 24.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("✅ Yay", fontSize = 24.sp, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
 
                     Surface(
                         color = Color.Black.copy(alpha = 0.2f),
@@ -237,7 +235,7 @@ fun MainDashboard(
                             .clip(CircleShape)
                             .clickable { onShowPermissions() }
                     ) {
-                        Text("?", color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+                        Text("?", color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
                     }
 
                     Spacer(modifier = Modifier.weight(1f))
@@ -245,12 +243,12 @@ fun MainDashboard(
                     IconButton(onClick = {
                         context.startActivity(Intent(context, SettingsActivity::class.java))
                     }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onPrimary)
                     }
                 }
                 Text(
                     "All permissions granted, now awaiting notifications. Feel free to dismiss this app.",
-                    fontSize = 13.sp, color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 13.sp, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
@@ -424,9 +422,8 @@ fun CustomMuteSection(context: Context) {
             modifier = Modifier.fillMaxWidth(),
             enabled = isActive,
             shape = RoundedCornerShape(12.dp), // Matches modern Material 3
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
         ) {
-            Text("Apply Custom Mute", fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Apply Custom Mute", fontWeight = FontWeight.Bold)
         }
     }
 }
