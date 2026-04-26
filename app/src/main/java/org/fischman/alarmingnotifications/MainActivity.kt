@@ -10,7 +10,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.widget.NumberPicker
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -64,22 +63,19 @@ fun MainScreen() {
     val context = LocalContext.current
     val prefs = remember { getSharedPreferences(context) }
 
-    // UI Refresh trigger based on Prefs changes
-    var refreshCounter by remember { mutableIntStateOf(0) }
+    var mutedUntilStr by remember { mutableStateOf(mutedUntil(context)) }
+    var muteCount by remember { mutableIntStateOf(muteCountRemaining(context)) }
 
     DisposableEffect(prefs) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == muteDeadlineKey || key == muteCountKey) {
-                refreshCounter++
+                mutedUntilStr = mutedUntil(context)
+                muteCount = muteCountRemaining(context)
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-
-    // Reactively compute mute status whenever refreshCounter changes
-    val mutedUntilStr = remember(refreshCounter) { mutedUntil(context) }
-    val muteCount = remember(refreshCounter) { muteCountRemaining(context) }
 
     // Permission check trigger (when returning from settings)
     var permissionCheckTrigger by remember { mutableIntStateOf(0) }
