@@ -35,13 +35,20 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 
 class MainActivity : ComponentActivity() {
+    private var resumeCallback: (() -> Unit)? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             Theme {
-                MainScreen()
+                MainScreen(onRegisterResumeCallback = { resumeCallback = it })
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        resumeCallback?.invoke()
     }
 }
 
@@ -59,7 +66,7 @@ internal data class PermissionStatus(
 )
 
 @Composable
-fun MainScreen() {
+fun MainScreen(onRegisterResumeCallback: ((() -> Unit)?) -> Unit = {}) {
     val context = LocalContext.current
     val prefs = remember { getSharedPreferences(context) }
 
@@ -80,6 +87,12 @@ fun MainScreen() {
     // Permission check trigger (when returning from settings)
     var permissionCheckTrigger by remember { mutableIntStateOf(0) }
     var forcePermissionShow by remember { mutableStateOf(false) }
+
+    // Re-check permissions on every Activity resume to catch return from settings permissions granting.
+    DisposableEffect(Unit) {
+        onRegisterResumeCallback { permissionCheckTrigger++ }
+        onDispose { onRegisterResumeCallback(null) }
+    }
 
     val permissions = remember(permissionCheckTrigger) {
         getPermissionStatuses(context)
@@ -223,7 +236,7 @@ fun MainDashboard(
 
     Scaffold(
         topBar = {
-            Column(modifier = Modifier.background(MaterialTheme.colorScheme.primary).padding(16.dp, 20.dp)) {
+            Column(modifier = Modifier.background(MaterialTheme.colorScheme.primary).windowInsetsPadding(WindowInsets.statusBars).padding(16.dp, 20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("✅ Yay", fontSize = 24.sp, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
 
