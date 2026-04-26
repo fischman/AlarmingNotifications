@@ -38,7 +38,8 @@ yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
 "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
   "platform-tools" \
   "platforms;android-35" \
-  "build-tools;35.0.0"
+  "build-tools;35.0.0" \
+  "26.1.10909125" `# Must match ../app/build.gradle.kts ndkVersion!`
 
 echo ""
 echo "Done. Add to your shell profile:"

@@ -1,11 +1,14 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "org.fischman.alarmingnotifications"
     compileSdk = 34
+
+    ndkVersion = "26.1.10909125" // Must match the version in ../.headless/install-android-sdk.sh !
 
     defaultConfig {
         applicationId = "org.fischman.alarmingnotifications"
@@ -20,7 +23,8 @@ android {
             isDebuggable = true
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -37,18 +41,21 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+        compose = true
     }
 }
 
 dependencies {
+    // The Bill of Materials (BOM) handles versioning for all compose libs
+    val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("com.google.accompanist:accompanist-drawablepainter:0.36.0")
 
-    // implementation("androidx.core:core-ktx:1.12.0")
-    // implementation("androidx.appcompat:appcompat:1.6.1")
-    // implementation("com.google.android.material:material:1.10.0")
-    // implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    // implementation("androidx.navigation:navigation-fragment-ktx:2.7.5")
-    // implementation("androidx.navigation:navigation-ui-ktx:2.7.5")
-    // testImplementation("junit:junit:4.13.2")
-    // androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    // androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    debugImplementation("androidx.compose.ui:ui-tooling")
 }

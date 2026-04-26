@@ -1,137 +1,273 @@
 package org.fischman.alarmingnotifications
 
-import android.app.Activity
+import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.Drawable
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
-import android.util.TypedValue
-import android.view.Gravity
-import android.view.View
-import android.view.ViewGroup
-import android.widget.CheckBox
-import android.widget.CompoundButton
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.Switch
-import android.widget.TextView
-import android.view.MenuItem
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.google.accompanist.drawablepainter.rememberDrawablePainter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class SettingsActivity : Activity() {
+data class NotificationAppInfo(
+    val appName: String,
+    val packageName: String,
+    val icon: Drawable,
+)
 
+class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(buildUI())
-        actionBar?.apply {
-            setDisplayHomeAsUpEnabled(true)
-            setTitle("Settings")
-        }
-    }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == android.R.id.home) {
-            finish()
-            return true
-        }
-        return super.onOptionsItemSelected(item)
-    }
-
-    private fun dp(v: Int): Int = TypedValue.applyDimension(
-        TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics
-    ).toInt()
-
-    private fun buildUI(): View {
         val prefs = getSharedPreferences(this)
+        setContent {
+            Theme {
+                SettingsScreen(
+                    prefs = prefs,
+                    onBack = { finish() }
+                )
+            }
+        }
+    }
+}
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun SettingsScreen(prefs: SharedPreferences, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+
+    // 1. Preference States
+    var ignoreKeep by remember { mutableStateOf(prefs.getBoolean(ignoreKeepKey, true)) }
+    var ignoreSuffix by remember { mutableStateOf(prefs.getString(ignoreSuffixKey, "/s") ?: "") }
+    val alarmPackages = remember {
+        mutableStateListOf<String>().apply {
+            addAll(prefs.getStringSet(alarmPackagesKey, defaultAlarmPackages) ?: defaultAlarmPackages)
+        }
+    }
+
+    // 2. App Loading Logic
+    var searchQuery by remember { mutableStateOf("") }
+    var allApps by remember { mutableStateOf<List<NotificationAppInfo>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        allApps = withContext(Dispatchers.IO) {
+            val pm = context.packageManager
+            pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                .filter { info ->
+                    (info.packageName != context.packageName) &&
+                            (pm.checkPermission(android.Manifest.permission.POST_NOTIFICATIONS, info.packageName) == PackageManager.PERMISSION_GRANTED)
+                }
+                .map { info ->
+                    NotificationAppInfo(
+                        appName = pm.getApplicationLabel(info).toString(),
+                        packageName = info.packageName,
+                        icon = pm.getApplicationIcon(info),
+                    )
+                }
+                .sortedBy { it.appName.lowercase() }
+        }
+        isLoading = false
+    }
+
+    val filteredApps = remember(searchQuery, allApps) {
+        val trimmed = searchQuery.trim()
+        if (trimmed.isEmpty()) allApps
+        else allApps.filter {
+            it.appName.contains(trimmed, ignoreCase = true) ||
+            it.packageName.contains(trimmed, ignoreCase = true)
+        }
+    }
+
+    val topSectionItems = listOf<@Composable () -> Unit>(
+        { SectionHeader("Notification Filters") },
+        {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable {
+                    ignoreKeep = !ignoreKeep
+                    prefs.edit().putBoolean(ignoreKeepKey, ignoreKeep).apply()
+                }.padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Ignore Google Keep reminders", modifier = Modifier.weight(1f))
+                Switch(checked = ignoreKeep, onCheckedChange = {
+                    ignoreKeep = it
+                    prefs.edit().putBoolean(ignoreKeepKey, it).apply()
+                })
+            }
+        },
+        { Text("Ignore notifications whose text ends with:", fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp)) },
+        {
+            OutlinedTextField(
+                value = ignoreSuffix,
+                onValueChange = {
+                    ignoreSuffix = it
+                    prefs.edit().putString(ignoreSuffixKey, it).apply()
+                },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                placeholder = { Text("e.g. /s") },
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp)
+            )
+        },
+        { Spacer(modifier = Modifier.height(24.dp)) },
+        { SectionHeader("Apps to Alarm On") },
+        {
+            Text(
+                "Select additional apps whose notifications should trigger an alarm:",
+                fontSize = 13.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 12.dp)
             )
         }
+    )
 
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(32))
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+    val searchBarIndex = topSectionItems.size
+
+    Scaffold(
+        modifier = Modifier.imePadding(),
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            )
         }
+    ) { padding ->
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)
+        ) {
+            topSectionItems.forEach { item { it() } }
 
-        content.addView(sectionHeader("Notification Filters"))
-
-        content.addView(Switch(this).apply {
-            text = "Ignore Google Keep reminders:"
-            textSize = 15f
-            isChecked = prefs.getBoolean(ignoreKeepKey, true)
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, dp(8), 0, dp(8)) }
-            setOnCheckedChangeListener { _: CompoundButton, checked: Boolean ->
-                prefs.edit().putBoolean(ignoreKeepKey, checked).apply()
-            }
-        })
-
-        content.addView(TextView(this).apply {
-            text = "Ignore notifications whose text ends with:"
-            textSize = 15f
-            setTextColor(Color.BLACK)
-            setPadding(0, dp(8), 0, dp(4))
-        })
-        content.addView(EditText(this).apply {
-            setText(prefs.getString(ignoreSuffixKey, "/s"))
-            textSize = 15f
-            hint = "e.g. /s"
-            background = GradientDrawable().apply {
-                setColor(Color.WHITE)
-                setStroke(dp(1), Color.GRAY)
-                cornerRadius = dp(6).toFloat()
-            }
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, 0, dp(8)) }
-            addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
-                override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
-                override fun afterTextChanged(e: Editable?) {
-                    prefs.edit().putString(ignoreSuffixKey, e?.toString() ?: "").apply()
+            // CHANGE: Use stickyHeader instead of item
+            stickyHeader {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    // This ensures the background matches the theme and hides scrolling items behind it
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                            .onFocusChanged { focusState ->
+                                if (focusState.isFocused) {
+                                    scope.launch {
+                                        listState.animateScrollToItem(searchBarIndex)
+                                    }
+                                }
+                            },
+                        placeholder = { Text("Filter apps…") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
                 }
-            })
-        })
-
-        content.addView(sectionHeader("Apps to Alarm On"))
-        content.addView(TextView(this).apply {
-            text = "Select additional apps whose notifications should trigger an alarm:"
-            textSize = 13f
-            setTextColor(Color.parseColor("#666666"))
-            setPadding(0, dp(4), 0, dp(12))
-        })
-
-        val appsView = NotificationAppsView(this).apply {
-            checkedPackages.addAll(prefs.getStringSet(alarmPackagesKey, defaultAlarmPackages) ?: defaultAlarmPackages)
-            onCheckedChangeListener = { pkg, checked ->
-                prefs.edit().putStringSet(alarmPackagesKey, checkedPackages).apply()
             }
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        }
-        content.addView(appsView)
 
-        root.addView(content)
-        return root
+            if (isLoading) {
+                item {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(Modifier.padding(32.dp))
+                    }
+                }
+            } else {
+                items(filteredApps, key = { it.packageName }) { app ->
+                    AppRow(
+                        app = app,
+                        isChecked = alarmPackages.contains(app.packageName),
+                        onCheckedChange = { isChecked ->
+                            if (isChecked) alarmPackages.add(app.packageName)
+                            else alarmPackages.remove(app.packageName)
+                            prefs.edit().putStringSet(alarmPackagesKey, alarmPackages.toSet()).apply()
+                        }
+                    )
+                }
+            }
+
+            // NEW: Large spacer at the bottom
+            // fillParentMaxHeight(0.9f) ensures the list is always long enough to
+            // allow the search bar to stay at the top of the screen even if
+            // 0 apps match the filter.
+            item {
+                Spacer(modifier = Modifier.fillParentMaxHeight(0.9f))
+            }
+        }
     }
+}
 
-    private fun sectionHeader(title: String): View =
-        TextView(this).apply {
-            text = title
-            textSize = 16f
-            setTextColor(Color.BLACK)
-            setTypeface(null, Typeface.BOLD)
-            setPadding(0, dp(8), 0, dp(4))
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, dp(8), 0, 0) }
+@Composable
+fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(vertical = 8.dp)
+    )
+}
+
+@Composable
+fun AppRow(app: NotificationAppInfo, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!isChecked) }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = isChecked, onCheckedChange = null)
+        Spacer(modifier = Modifier.width(8.dp))
+        Image(
+            painter = rememberDrawablePainter(drawable = app.icon),
+            contentDescription = null,
+            modifier = Modifier.size(40.dp).clip(CircleShape)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(text = app.appName, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Text(text = app.packageName, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
 }

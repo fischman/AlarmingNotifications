@@ -36,7 +36,8 @@
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
-            android:label="Settings" />
+            android:label="Settings"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
 
         <service
             android:name=".NotificationListener"

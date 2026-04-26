@@ -1,738 +1,481 @@
 package org.fischman.alarmingnotifications
 
 import android.Manifest
-import android.app.Activity
 import android.app.AlarmManager
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.provider.Settings
-import android.util.TypedValue
-import android.view.Gravity
-import android.view.View
-import android.view.ViewGroup
-import android.widget.Button
-import android.widget.LinearLayout
 import android.widget.NumberPicker
-import android.widget.ScrollView
-import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 
-private const val postNotificationsRequestCode = 1001
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            Theme {
+                MainScreen()
+            }
+        }
+    }
+}
 
-class MainActivity : Activity() {
-    private enum class PermissionStep {
-        SendNotifications,
-        ReadNotifications,
-        SetExactAlarms,
+internal enum class PermissionStep {
+    SendNotifications,
+    ReadNotifications,
+    SetExactAlarms,
+}
+
+internal data class PermissionStatus(
+    val step: PermissionStep,
+    val label: String,
+    val reason: String,
+    val granted: Boolean,
+)
+
+@Composable
+fun MainScreen() {
+    val context = LocalContext.current
+    val prefs = remember { getSharedPreferences(context) }
+
+    // UI Refresh trigger based on Prefs changes
+    var refreshCounter by remember { mutableIntStateOf(0) }
+
+    DisposableEffect(prefs) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == muteDeadlineKey || key == muteCountKey) {
+                refreshCounter++
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 
-    private data class PermissionStatus(
-        val step: PermissionStep,
-        val label: String,
-        val reason: String,
-        val granted: Boolean,
+    // Reactively compute mute status whenever refreshCounter changes
+    val mutedUntilStr = remember(refreshCounter) { mutedUntil(context) }
+    val muteCount = remember(refreshCounter) { muteCountRemaining(context) }
+
+    // Permission check trigger (when returning from settings)
+    var permissionCheckTrigger by remember { mutableIntStateOf(0) }
+    var forcePermissionShow by remember { mutableStateOf(false) }
+
+    val permissions = remember(permissionCheckTrigger) {
+        getPermissionStatuses(context)
+    }
+    val allGranted = permissions.all { it.granted }
+
+    // Logic: Show permissions if they are missing OR if the user manually requested to see them via '?'
+    if (!allGranted || forcePermissionShow) {
+        PermissionSetupScreen(permissions) {
+            forcePermissionShow = false
+            permissionCheckTrigger++
+        }
+    } else {
+        MainDashboard(
+            mutedUntilStr = mutedUntilStr,
+            muteCount = muteCount,
+            onShowPermissions = { forcePermissionShow = true }
+        )
+    }
+}
+
+@Composable
+internal fun PermissionSetupScreen(statuses: List<PermissionStatus>, onRefresh: () -> Unit) {
+    val context = LocalContext.current
+    val nextPermission = statuses.firstOrNull { !it.granted }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { onRefresh() }
+
+    Scaffold { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colorScheme.surface)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF263238))
+                    .padding(16.dp, 20.dp)
+            ) {
+                Text("Permission setup", fontSize = 24.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(
+                    "Grant the minimum access needed for alarm delivery, notification listening, and snooze support.",
+                    fontSize = 15.sp, color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                item {
+                    PermissionStatusCard(statuses)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            when (nextPermission?.step) {
+                                PermissionStep.SendNotifications -> {
+                                    if (Build.VERSION.SDK_INT >= 33) {
+                                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                }
+                                PermissionStep.ReadNotifications -> {
+                                    context.startActivity(getNotificationListenerSettingsIntent(context))
+                                }
+                                PermissionStep.SetExactAlarms -> {
+                                    if (Build.VERSION.SDK_INT >= 31) {
+                                        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                            data = Uri.fromParts("package", context.packageName, null)
+                                        }
+                                        context.startActivity(intent)
+                                    }
+                                }
+                                // No missing permissions? This button acts as a "Back" button
+                                null -> onRefresh()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            if (nextPermission == null) "All set" else "Continue: ${nextPermission.label}",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun PermissionStatusCard(statuses: List<PermissionStatus>) {
+    Surface(
+        color = Color(0xFFFFEB3B),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Required permissions:", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+            Spacer(modifier = Modifier.height(12.dp))
+            statuses.forEach { status ->
+                PermissionStatusRow(status)
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+        }
+    }
+}
+
+@Composable
+internal fun PermissionStatusRow(status: PermissionStatus) {
+    val labelColor = if (status.granted) Color(0xFF1B5E20) else Color.Black
+    val chipColor = if (status.granted) Color(0xFFA5D6A7) else Color(0xFFEF9A9A)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(chipColor, RoundedCornerShape(4.dp))
+            .padding(14.dp, 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(if (status.granted) "●" else "○", fontSize = 18.sp, color = labelColor)
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(status.label, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+            Text(status.reason, fontSize = 12.sp, color = Color.Black)
+        }
+        Text(
+            if (status.granted) "Granted" else "Needed",
+            fontSize = 12.sp, fontWeight = FontWeight.Bold, color = labelColor
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+fun MainDashboard(
+    mutedUntilStr: String,
+    muteCount: Int,
+    onShowPermissions: () -> Unit
+) {
+    val context = LocalContext.current
+
+    Scaffold(
+        topBar = {
+            Column(modifier = Modifier.background(Color(0xFF4CAF50)).padding(16.dp, 20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("✅ Yay", fontSize = 24.sp, color = Color.White, fontWeight = FontWeight.Bold)
+
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.2f),
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .clip(CircleShape)
+                            .clickable { onShowPermissions() }
+                    ) {
+                        Text("?", color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    IconButton(onClick = {
+                        context.startActivity(Intent(context, SettingsActivity::class.java))
+                    }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                    }
+                }
+                Text(
+                    "All permissions granted, now awaiting notifications. Feel free to dismiss this app.",
+                    fontSize = 13.sp, color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+    ) { padding ->
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (mutedUntilStr.isNotEmpty() || muteCount > 0) {
+                item {
+                    ActiveMutesSection(mutedUntilStr, muteCount, context)
+                }
+            }
+
+            item {
+                Spacer(
+                    modifier = Modifier
+                        .height(8.dp)
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+            }
+
+            item {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    QuickMuteSection(context)
+                    Spacer(modifier = Modifier.height(24.dp))
+                    CustomMuteSection(context)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ActiveMutesSection(mutedUntilStr: String, muteCount: Int, context: Context) {
+    Column(modifier = Modifier.background(MaterialTheme.colorScheme.errorContainer).padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "🔕 Active Mutes",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f)
+            )
+            Surface(
+                color = MaterialTheme.colorScheme.error,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.clickable { unmuteAll(context) }
+            ) {
+                Text(
+                    "🗑️ Unmute All",
+                    color = MaterialTheme.colorScheme.onError,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(12.dp, 6.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (mutedUntilStr.isNotEmpty()) {
+                MuteBadge("🔕 Until ${mutedUntilStr.substringBefore('.')}") { unmuteTime(context) }
+            }
+            if (muteCount > 0) {
+                MuteBadge("🔕 $muteCount notification${if (muteCount > 1) "s" else ""}") { unmuteCount(context) }
+            }
+        }
+    }
+}
+
+@Composable
+fun MuteBadge(text: String, onRemove: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.error,
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 6.dp)
+        ) {
+            Text(text, color = MaterialTheme.colorScheme.onError, fontSize = 13.sp)
+
+            Box(
+                modifier = Modifier
+                    .padding(start = 4.dp)
+                    .clip(CircleShape)
+                    .clickable { onRemove() }
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    "×",
+                    color = MaterialTheme.colorScheme.onError,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickMuteSection(context: Context) {
+    Column {
+        Text("Quick Mute", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            QuickButton("15m", Modifier.weight(1f)) { muteForMinutes(context, 15) }
+            QuickButton("30m", Modifier.weight(1f)) { muteForMinutes(context, 30) }
+            QuickButton("1h", Modifier.weight(1f)) { muteForHours(context, 1) }
+            QuickButton("2h", Modifier.weight(1f)) { muteForHours(context, 2) }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            (1..5).forEach { n ->
+                QuickButton("${n}n", Modifier.weight(1f)) { muteForNNotifications(context, n) }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        contentPadding = PaddingValues(0.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
+    ) {
+        Text(label, fontSize = 14.sp)
+    }
+}
+
+@Composable
+fun CustomMuteSection(context: Context) {
+    var hours by remember { mutableIntStateOf(0) }
+    var notifs by remember { mutableIntStateOf(0) }
+    val isActive = hours > 0 || notifs > 0
+
+    Column {
+        Text("Custom Mute", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IntWheelPicker(value = hours, max = 48, label = "Hours") { hours = it }
+
+            // Subtle visual separator
+            Text("&", fontSize = 24.sp, color = MaterialTheme.colorScheme.outlineVariant)
+
+            IntWheelPicker(value = notifs, max = 20, label = "Notifications") { notifs = it }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                if (hours > 0) muteForHours(context, hours)
+                if (notifs > 0) muteForNNotifications(context, notifs)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = isActive,
+            shape = RoundedCornerShape(12.dp), // Matches modern Material 3
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+        ) {
+            Text("Apply Custom Mute", fontWeight = FontWeight.Bold, color = Color.White)
+        }
+    }
+}
+
+private fun getPermissionStatuses(context: Context): List<PermissionStatus> {
+    val statuses = mutableListOf<PermissionStatus>()
+
+    if (Build.VERSION.SDK_INT >= 33) {
+        statuses += PermissionStatus(
+            PermissionStep.SendNotifications,
+            "Send notifications",
+            "Required so the app can post alarms.",
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
+        )
+    }
+
+    val enabledListeners = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+    statuses += PermissionStatus(
+        PermissionStep.ReadNotifications,
+        "Read notifications",
+        "Required so the app can detect eligible notifications from other apps.",
+        enabledListeners?.contains("${context.packageName}/${context.packageName}.NotificationListener") == true
     )
 
-    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        // When mute settings change, refresh the UI
-        if (key == muteDeadlineKey || key == muteCountKey) {
-            runOnUiThread {
-                if (hasAllPermissions()) {
-                    setContentView(buildMainUI())
-                }
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-
-        // Register preferences listener to auto-update UI when mutes change
-        getSharedPreferences(this).registerOnSharedPreferenceChangeListener(prefsListener)
-
-        refreshUi()
-    }
-
-    private fun refreshUi() {
-        setContentView(if (firstMissingPermission() != null) buildPermissionSetupUI() else buildMainUI())
-    }
-
-    override fun onPause() {
-        super.onPause()
-        // Unregister listener to avoid leaks
-        getSharedPreferences(this).unregisterOnSharedPreferenceChangeListener(prefsListener)
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray,
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == postNotificationsRequestCode) {
-            refreshUi()
-        }
-    }
-
-    private fun notificationListenerSettingsIntent(): Intent {
-        return if (Build.VERSION.SDK_INT >= 30) {
-            Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).apply {
-                putExtra(
-                    Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
-                    android.content.ComponentName(
-                        packageName,
-                        "$packageName.NotificationListener",
-                    ).flattenToString(),
-                )
-            }
-        } else {
-            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-        }
-    }
-
-    private fun permissionStatuses(): List<PermissionStatus> {
-        val statuses = mutableListOf<PermissionStatus>()
-
-        if (Build.VERSION.SDK_INT >= 33) {
-            statuses += PermissionStatus(
-                PermissionStep.SendNotifications,
-                "Send notifications",
-                "Required so the app can post alarms.",
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
-            )
-        }
-
+    if (Build.VERSION.SDK_INT >= 31) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         statuses += PermissionStatus(
-            PermissionStep.ReadNotifications,
-            "Read notifications",
-            "Required so the app can detect eligible notifications from other apps.",
-            Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-                ?.contains("$packageName/$packageName.NotificationListener") == true
+            PermissionStep.SetExactAlarms,
+            "Set exact alarms",
+            "Required for reliable timing of snooze on an alarming notification.",
+            alarmManager.canScheduleExactAlarms(),
         )
+    }
+    return statuses
+}
 
-        if (Build.VERSION.SDK_INT >= 31) {
-            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            statuses += PermissionStatus(
-                PermissionStep.SetExactAlarms,
-                "Set exact alarms",
-                "Required for reliable timing of snooze on an alarming notification.",
-                alarmManager.canScheduleExactAlarms(),
+private fun getNotificationListenerSettingsIntent(context: Context): Intent {
+    return if (Build.VERSION.SDK_INT >= 30) {
+        Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).apply {
+            putExtra(
+                Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
+                android.content.ComponentName(context.packageName, "${context.packageName}.NotificationListener").flattenToString()
             )
         }
-
-        return statuses
-    }
-
-    private fun firstMissingPermission(): PermissionStatus? {
-        return permissionStatuses().firstOrNull { !it.granted }
-    }
-
-    private fun grantedPermissionSteps(): Set<PermissionStep> {
-        return permissionStatuses().filter { it.granted }.mapTo(mutableSetOf()) { it.step }
-    }
-
-    private fun requestNextMissingPermission() {
-        when (firstMissingPermission()?.step) {
-            PermissionStep.SendNotifications -> {
-                requestPermissions(
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    postNotificationsRequestCode,
-                )
-            }
-
-            PermissionStep.ReadNotifications -> {
-                startActivity(notificationListenerSettingsIntent())
-            }
-
-            PermissionStep.SetExactAlarms -> {
-                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                    data = Uri.fromParts("package", packageName, null)
-                }
-                startActivity(intent)
-            }
-
-            null -> Unit
-        }
-    }
-
-    private fun hasAllPermissions(): Boolean {
-        return permissionStatuses().all { it.granted }
-    }
-
-    private fun buildPermissionSetupUI(): View {
-        val rootLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-            )
-            setBackgroundColor(Color.parseColor("#f8f9fb"))
-        }
-
-        rootLayout.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#263238"))
-            setPadding(dp(16), dp(20), dp(16), dp(20))
-
-            addView(TextView(this@MainActivity).apply {
-                text = "Permission setup"
-                textSize = 24f
-                setTextColor(Color.WHITE)
-                setTypeface(null, Typeface.BOLD)
-            })
-            addView(TextView(this@MainActivity).apply {
-                text = "Grant the minimum access needed for alarm delivery, notification listening, and snooze support."
-                textSize = 15f
-                setTextColor(Color.WHITE)
-                alpha = 0.9f
-                setPadding(0, dp(6), 0, 0)
-            })
-        })
-
-        val scrollView = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-            )
-        }
-
-        val contentLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-        }
-
-        contentLayout.addView(buildPermissionStatusCard())
-
-        contentLayout.addView(Button(this).apply {
-            val nextPermission = firstMissingPermission()
-            text = if (nextPermission == null) "All set" else "Continue: ${nextPermission.label}"
-            textSize = 15f
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#4CAF50"))
-                cornerRadius = dp(10).toFloat()
-            }
-            setTextColor(Color.WHITE)
-            setTypeface(null, Typeface.BOLD)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                gravity = android.view.Gravity.CENTER_HORIZONTAL // Center horizontally
-            }
-            setOnClickListener { if (hasAllPermissions()) { refreshUi() } else { requestNextMissingPermission() } }
-        })
-
-        scrollView.addView(contentLayout)
-        rootLayout.addView(scrollView)
-        return rootLayout
-    }
-
-    private fun buildPermissionStatusCard(): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                setColor(Color.YELLOW)
-                cornerRadius = dp(14).toFloat()
-            }
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
-            lp.setMargins(0, 0, 0, dp(16))
-            layoutParams = lp
-
-            addView(TextView(this@MainActivity).apply {
-                text = "Required permissions:"
-                textSize = 16f
-                setTextColor(Color.BLACK) // parseColor("#263238"))
-                setTypeface(null, Typeface.BOLD)
-                setPadding(0, dp(4), 0, dp(12))
-            })
-
-            permissionStatuses().forEach { status ->
-                addView(buildPermissionStatusRow(status))
-            }
-        }
-    }
-
-    private fun buildPermissionStatusRow(status: PermissionStatus): View {
-        val labelColor = if (status.granted) "#2e7d32" else "#000000"
-        val chipColor = if (status.granted) "#7df085" else "#f5989e"
-        val label = if (status.granted) "Granted" else "Needed"
-
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor(chipColor))
-                cornerRadius = dp(4).toFloat()
-            }
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
-            lp.setMargins(0, 0, 0, dp(10))
-            layoutParams = lp
-
-            addView(TextView(this@MainActivity).apply {
-                text = if (status.granted) "●" else "○"
-                textSize = 18f
-                setTextColor(Color.parseColor(labelColor))
-                setPadding(0, 0, dp(12), 0)
-            })
-
-            addView(LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-
-                addView(TextView(this@MainActivity).apply {
-                    text = status.label
-                    textSize = 15f
-                    setTextColor(Color.BLACK)
-                    setTypeface(null, Typeface.BOLD)
-                })
-                addView(TextView(this@MainActivity).apply {
-                    text = status.reason
-                    textSize = 12f
-                    setTextColor(Color.BLACK)
-                    setPadding(0, dp(3), 0, 0)
-                })
-            })
-
-            addView(TextView(this@MainActivity).apply {
-                text = label
-                textSize = 12f
-                setTextColor(Color.parseColor(labelColor))
-                setTypeface(null, Typeface.BOLD)
-            })
-        }
-    }
-
-    private fun buildMainUI(): View {
-        val restart = {
-            val intent = this.intent
-            this.finish()
-            this.startActivity(intent)
-        }
-
-        val rootLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        }
-
-        // Header - green banner with Yay
-        rootLayout.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#4CAF50"))
-            setPadding(dp(16), dp(20), dp(16), dp(20))
-
-            addView(LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                addView(TextView(this@MainActivity).apply {
-                    text = "✅ Yay"
-                    textSize = 24f
-                    setTextColor(Color.WHITE)
-                    setTypeface(null, Typeface.BOLD)
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                })
-
-                addView(TextView(this@MainActivity).apply {
-                    text = "?"
-                    textSize = 10f
-                    setTextColor(Color.WHITE)
-                    setPadding(dp(5), dp(1), dp(5), dp(1))
-                    background = GradientDrawable().apply {
-                        setColor(Color.parseColor("#33000000"))
-                        cornerRadius = dp(20).toFloat()
-                    }
-                    setOnClickListener { setContentView(buildPermissionSetupUI()) }
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                        leftMargin = dp(4)
-                        gravity = Gravity.TOP
-                        topMargin = dp(4)
-                    }
-                })
-
-                addView(View(this@MainActivity).apply { layoutParams = LinearLayout.LayoutParams(0, 0, 1f) }) // Spacer.
-
-                addView(TextView(this@MainActivity).apply {
-                    text = "⚙"
-                    textSize = 22f
-                    setTextColor(Color.WHITE)
-                    setPadding(dp(8), dp(4), dp(8), dp(4))
-                    background = GradientDrawable().apply {
-                        setColor(Color.parseColor("#33000000"))
-                        cornerRadius = dp(20).toFloat()
-                    }
-                    setOnClickListener {
-                        startActivity(android.content.Intent(this@MainActivity, SettingsActivity::class.java))
-                    }
-                })
-            })
-
-            addView(TextView(this@MainActivity).apply {
-                text = "All permissions granted, now awaiting notifications. Feel free to dismiss this app."
-                textSize = 13f
-                setTextColor(Color.WHITE)
-                alpha = 0.9f
-                setPadding(0, dp(4), 0, 0)
-            })
-        })
-
-        // Active Mutes section
-        val mutedUntilStr = mutedUntil(this)
-        val muteCount = muteCountRemaining(this)
-        if (mutedUntilStr.isNotEmpty() || muteCount > 0) {
-            rootLayout.addView(buildActiveMutesSection(mutedUntilStr, muteCount, restart))
-        }
-
-        // Divider
-        rootLayout.addView(View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(8)
-            )
-            setBackgroundColor(Color.parseColor("#f0f0f0"))
-        })
-
-        // Scrollable content area
-        val scrollView = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        }
-
-        val contentLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-        }
-
-        // Quick Mute section
-        contentLayout.addView(buildQuickMuteSection(restart))
-
-        // Custom Mute section
-        contentLayout.addView(buildCustomMuteSection(restart))
-
-        scrollView.addView(contentLayout)
-        rootLayout.addView(scrollView)
-
-        return rootLayout
-    }
-
-    private fun buildActiveMutesSection(mutedUntilStr: String, muteCount: Int, restart: () -> Unit): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#fff3e0"))
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-
-            // First row: "Active Mutes" title on left, "Unmute All" button on right
-            addView(LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, 0, 0, dp(8))
-
-                addView(TextView(this@MainActivity).apply {
-                    text = "🔕 Active Mutes"
-                    textSize = 15f
-                    setTextColor(Color.parseColor("#e65100"))
-                    setTypeface(null, android.graphics.Typeface.BOLD)
-                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-                })
-
-                addView(createUnmuteAllButton(restart))
-            })
-
-            // Second row: mute badges side-by-side
-            addView(LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-
-                if (mutedUntilStr.isNotEmpty()) {
-                    // Format time string: drop subseconds
-                    val cleanTime = mutedUntilStr.substringBefore('.')
-                    addView(createMuteBadge("🔕 Until $cleanTime") {
-                        unmuteTime(this@MainActivity)
-                        restart()
-                    })
-                }
-
-                if (muteCount > 0) {
-                    addView(createMuteBadge("🔕 $muteCount notification${if (muteCount > 1) "s" else ""}") {
-                        unmuteCount(this@MainActivity)
-                        restart()
-                    })
-                }
-            })
-        }
-    }
-
-    private fun createMuteBadge(text: String, onClose: () -> Unit): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#ff9800"))
-                cornerRadius = dp(20).toFloat()
-            }
-            setPadding(dp(12), dp(6), dp(12), dp(6))
-            gravity = Gravity.CENTER_VERTICAL
-            val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-            lp.setMargins(0, 0, dp(8), 0)
-            layoutParams = lp
-
-            addView(TextView(this@MainActivity).apply {
-                this.text = text
-                textSize = 13f
-                setTextColor(Color.WHITE)
-            })
-
-            addView(TextView(this@MainActivity).apply {
-                this.text = " ×"
-                textSize = 16f
-                setTextColor(Color.WHITE)
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setPadding(dp(6), 0, 0, 0)
-                setOnClickListener { onClose() }
-            })
-        }
-    }
-
-    private fun createUnmuteAllButton(restart: () -> Unit): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#f44336"))
-                cornerRadius = dp(20).toFloat()
-            }
-            setPadding(dp(12), dp(6), dp(12), dp(6))
-            gravity = Gravity.CENTER_VERTICAL
-            setOnClickListener {
-                unmuteAll(this@MainActivity)
-                restart()
-            }
-
-            addView(TextView(this@MainActivity).apply {
-                text = "🗑️ Unmute All"
-                textSize = 13f
-                setTextColor(Color.WHITE)
-            })
-        }
-    }
-
-    private fun buildQuickMuteSection(restart: () -> Unit): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 0, 0, dp(24))
-            }
-            addView(TextView(this@MainActivity).apply {
-                text = "Quick Mute"
-                textSize = 15f
-                setTextColor(Color.parseColor("#333333"))
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setPadding(0, 0, 0, dp(12))
-            })
-
-            // Time quick buttons: 15m, 30m, 1h, 2h
-            addView(LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    setMargins(0, 0, 0, dp(8))
-                }
-
-                addView(createQuickButton("15m") { muteForMinutes(this@MainActivity, 15); restart() })
-                addView(createQuickButton("30m") { muteForMinutes(this@MainActivity, 30); restart() })
-                addView(createQuickButton("1h") { muteForHours(this@MainActivity, 1); restart() })
-                addView(createQuickButton("2h") { muteForHours(this@MainActivity, 2); restart() })
-            })
-
-            // Notification count quick buttons: 1n-5n
-            addView(LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-
-                addView(createQuickButton("1n") { muteForNNotifications(this@MainActivity, 1); restart() })
-                addView(createQuickButton("2n") { muteForNNotifications(this@MainActivity, 2); restart() })
-                addView(createQuickButton("3n") { muteForNNotifications(this@MainActivity, 3); restart() })
-                addView(createQuickButton("4n") { muteForNNotifications(this@MainActivity, 4); restart() })
-                addView(createQuickButton("5n") { muteForNNotifications(this@MainActivity, 5); restart() })
-            })
-        }
-    }
-
-    private fun createQuickButton(label: String, onClick: () -> Unit): View {
-        return Button(this).apply {
-            text = label
-            textSize = 14f
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#f5f5f5"))
-                setStroke(dp(1), Color.parseColor("#e0e0e0"))
-                cornerRadius = dp(8).toFloat()
-            }
-            setTextColor(Color.parseColor("#333333"))
-            val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            lp.setMargins(0, 0, dp(8), 0)
-            layoutParams = lp
-            setOnClickListener { onClick() }
-        }
-    }
-
-    private fun buildCustomMuteSection(restart: () -> Unit): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-
-            addView(TextView(this@MainActivity).apply {
-                text = "Custom Mute"
-                textSize = 15f
-                setTextColor(Color.parseColor("#333333"))
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setPadding(0, 0, 0, dp(12))
-            })
-
-            // NumberPickers row
-            val pickerRow = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                val lp = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-                lp.setMargins(0, 0, 0, dp(16))
-                layoutParams = lp
-            }
-
-            val hoursPicker = NumberPicker(this@MainActivity).apply {
-                minValue = 0
-                maxValue = 24
-                value = 0
-            }
-
-            val notifPicker = NumberPicker(this@MainActivity).apply {
-                minValue = 0
-                maxValue = 24
-                value = 0
-            }
-
-            val hoursGroup = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-                lp.setMargins(0, 0, dp(8), 0)
-                layoutParams = lp
-                gravity = Gravity.CENTER_HORIZONTAL
-
-                addView(TextView(this@MainActivity).apply {
-                    text = "Hours"
-                    textSize = 12f
-                    setTextColor(Color.parseColor("#666666"))
-                    gravity = Gravity.CENTER
-                    setPadding(0, 0, 0, dp(8))
-                })
-                addView(hoursPicker, LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    dp(150)
-                ))
-            }
-
-            val notifsGroup = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-                gravity = Gravity.CENTER_HORIZONTAL
-
-                addView(TextView(this@MainActivity).apply {
-                    text = "Notifications"
-                    textSize = 12f
-                    setTextColor(Color.parseColor("#666666"))
-                    gravity = Gravity.CENTER
-                    setPadding(0, 0, 0, dp(8))
-                })
-                addView(notifPicker, LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    dp(150)
-                ))
-            }
-
-            pickerRow.addView(hoursGroup)
-            pickerRow.addView(notifsGroup)
-            addView(pickerRow)
-
-            // Apply button
-            val applyButton = Button(this@MainActivity).apply {
-                text = "Apply Custom Mute"
-                textSize = 15f
-                background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#4CAF50"))
-                    cornerRadius = dp(8).toFloat()
-                }
-                setTextColor(Color.WHITE)
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setPadding(0, dp(14), 0, dp(14))
-                isEnabled = false
-                alpha = 0.5f
-                setOnClickListener {
-                    val hours = hoursPicker.value
-                    val notifs = notifPicker.value
-                    muteForHours(this@MainActivity, hours)
-                    muteForNNotifications(this@MainActivity, notifs)
-                    restart()
-                }
-            }
-            val updateButtonState = NumberPicker.OnValueChangeListener { _, _, _ ->
-                val isActive = hoursPicker.value > 0 || notifPicker.value > 0
-                applyButton.isEnabled = isActive
-                applyButton.alpha = if (isActive) 1.0f else 0.5f
-            }
-            hoursPicker.setOnValueChangedListener(updateButtonState)
-            notifPicker.setOnValueChangedListener(updateButtonState)
-            addView(applyButton)
-        }
-    }
-
-    private fun dp(value: Int): Int {
-        return TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP,
-            value.toFloat(),
-            resources.displayMetrics
-        ).toInt()
-    }
-
-    private fun alert(title: String, msg: String, onOK: () -> Unit) {
-        AlertDialog.Builder(this@MainActivity)
-            .setTitle(title)
-            .setMessage(msg)
-            .setPositiveButton("OK") { dialog, _ ->
-                dialog.dismiss()
-                onOK()
-            }
-            .create()
-            .show()
+    } else {
+        Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
     }
 }
