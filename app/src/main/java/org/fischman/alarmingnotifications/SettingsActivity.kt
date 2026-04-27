@@ -75,7 +75,6 @@ fun SettingsScreen(prefs: SharedPreferences, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
-    // 1. Preference States
     var ignoreKeep by remember { mutableStateOf(prefs.getBoolean(ignoreKeepKey, true)) }
     var ignoreSuffix by remember { mutableStateOf(prefs.getString(ignoreSuffixKey, "/s") ?: "") }
     val alarmPackages = remember {
@@ -84,8 +83,8 @@ fun SettingsScreen(prefs: SharedPreferences, onBack: () -> Unit) {
         }
     }
 
-    // 2. App Loading Logic
     var searchQuery by remember { mutableStateOf("") }
+    var showSelectedOnly by remember { mutableStateOf(false) }
     var allApps by remember { mutableStateOf<List<NotificationAppInfo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
@@ -109,12 +108,20 @@ fun SettingsScreen(prefs: SharedPreferences, onBack: () -> Unit) {
         isLoading = false
     }
 
-    val filteredApps = remember(searchQuery, allApps) {
-        val trimmed = searchQuery.trim()
-        if (trimmed.isEmpty()) allApps
-        else allApps.filter {
-            it.appName.contains(trimmed, ignoreCase = true) ||
-            it.packageName.contains(trimmed, ignoreCase = true)
+    val filteredApps by remember(searchQuery, allApps, showSelectedOnly) {
+        derivedStateOf {
+            val query = searchQuery.trim()
+            if (query.isEmpty() && !showSelectedOnly) {
+                allApps
+            } else {
+                val alarmSet = alarmPackages.toSet()
+                allApps.filter { app ->
+                    (query.isEmpty() ||
+                     app.appName.contains(query, ignoreCase = true) ||
+                     app.packageName.contains(query, ignoreCase = true)) &&
+                    (!showSelectedOnly || app.packageName in alarmSet)
+                }
+            }
         }
     }
 
@@ -188,31 +195,55 @@ fun SettingsScreen(prefs: SharedPreferences, onBack: () -> Unit) {
                     // This ensures the background matches the theme and hides scrolling items behind it
                     color = MaterialTheme.colorScheme.surface
                 ) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                            .onFocusChanged { focusState ->
-                                if (focusState.isFocused) {
-                                    scope.launch {
-                                        listState.animateScrollToItem(searchBarIndex)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                                .onFocusChanged { focusState ->
+                                    if (focusState.isFocused) {
+                                        scope.launch {
+                                            listState.animateScrollToItem(searchBarIndex)
+                                        }
+                                    }
+                                },
+                            placeholder = { Text("Filter apps...") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Clear")
                                     }
                                 }
                             },
-                        placeholder = { Text("Filter apps…") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear")
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.Start
+                        ) {
+                            FilterChip(
+                                selected = showSelectedOnly,
+                                onClick = { showSelectedOnly = !showSelectedOnly },
+                                label = { Text("Selected (${alarmPackages.size})") },
+                                trailingIcon = if (showSelectedOnly) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = "Clear filter",
+                                            modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                        )
+                                    }
+                                } else null
+                            )
+                        }
+                    }
                 }
             }
 
