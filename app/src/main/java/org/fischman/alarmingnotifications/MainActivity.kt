@@ -1,15 +1,9 @@
 package org.fischman.alarmingnotifications
 
-import android.Manifest
-import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.ComponentActivity
@@ -38,14 +32,26 @@ import androidx.compose.ui.viewinterop.AndroidView
 
 class MainActivity : ComponentActivity() {
     private var resumeCallback: (() -> Unit)? = null
+    private var contentAttached: Boolean = false
+    private var permissionsInFlight: Boolean = false
+
+    private fun launchPermissionsActivityIfNeeded(): Boolean {
+        if (permissionsInFlight) return false
+        if (hasAllRequiredPermissions(this)) {
+            permissionsInFlight = false
+            return false
+        }
+        permissionsInFlight = true
+        startActivity(PermissionsActivity.newIntent(this))
+        return true
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            Theme {
-                MainScreen(onRegisterResumeCallback = { resumeCallback = it })
-            }
-        }
+
+        if (launchPermissionsActivityIfNeeded()) return
+
+        ensureContent()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -60,8 +66,7 @@ class MainActivity : ComponentActivity() {
                 true
             }
             R.id.menu_permissions -> {
-                // AMI: make this real.
-                // forcePermissionShow = true
+                startActivity(PermissionsActivity.newIntent(this))
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -70,22 +75,21 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        resumeCallback?.invoke()
+        if (launchPermissionsActivityIfNeeded()) return
+        ensureContent()
     }
-}
 
-internal enum class PermissionStep {
-    SendNotifications,
-    ReadNotifications,
-    SetExactAlarms,
-}
+    private fun ensureContent() {
+        if (contentAttached) return
+        contentAttached = true
+        setContent {
+            Theme {
+                MainScreen()
+            }
+        }
+    }
 
-internal data class PermissionStatus(
-    val step: PermissionStep,
-    val label: String,
-    val reason: String,
-    val granted: Boolean,
-)
+}
 
 @Composable
 fun MainScreen(onRegisterResumeCallback: ((() -> Unit)?) -> Unit = {}) {
@@ -106,145 +110,27 @@ fun MainScreen(onRegisterResumeCallback: ((() -> Unit)?) -> Unit = {}) {
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 
-    // Permission check trigger (when returning from settings)
     var permissionCheckTrigger by remember { mutableIntStateOf(0) }
-    var forcePermissionShow by remember { mutableStateOf(false) }
+    val permissionsActivityLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        val grantedNow = hasAllRequiredPermissions(context)
+        if (grantedNow) {
+            (context as? android.app.Activity)?.recreate()
+        } else {
+            permissionCheckTrigger++
+        }
+    }
 
-    // Re-check permissions on every Activity resume to catch return from settings permissions granting.
     DisposableEffect(Unit) {
         onRegisterResumeCallback { permissionCheckTrigger++ }
         onDispose { onRegisterResumeCallback(null) }
     }
 
-    val permissions = remember(permissionCheckTrigger) {
-        getPermissionStatuses(context)
-    }
-    val allGranted = permissions.all { it.granted }
-
-    // Logic: Show permissions if they are missing OR if the user manually requested to see them via '?'
-    if (!allGranted || forcePermissionShow) {
-        PermissionSetupScreen(permissions) {
-            forcePermissionShow = false
-            permissionCheckTrigger++
-        }
-    } else {
-        MainDashboard(
-            mutedUntilStr = mutedUntilStr,
-            muteCount = muteCount,
-            onShowPermissions = { forcePermissionShow = true }
-        )
-    }
-}
-
-@Composable
-internal fun PermissionSetupScreen(statuses: List<PermissionStatus>, onRefresh: () -> Unit) {
-    val context = LocalContext.current
-    val nextPermission = statuses.firstOrNull { !it.granted }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { onRefresh() }
-
-    Scaffold { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).background(MaterialTheme.colorScheme.surface)) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .padding(16.dp, 20.dp)
-            ) {
-                Text("Permission setup", fontSize = 24.sp, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
-                Text(
-                    "Grant the minimum access needed for alarm delivery, notification listening, and snooze support.",
-                    fontSize = 15.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
-                    modifier = Modifier.padding(top = 6.dp)
-                )
-            }
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                item {
-                    PermissionStatusCard(statuses)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            when (nextPermission?.step) {
-                                PermissionStep.SendNotifications -> {
-                                    if (Build.VERSION.SDK_INT >= 33) {
-                                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    }
-                                }
-                                PermissionStep.ReadNotifications -> {
-                                    context.startActivity(getNotificationListenerSettingsIntent(context))
-                                }
-                                PermissionStep.SetExactAlarms -> {
-                                    if (Build.VERSION.SDK_INT >= 31) {
-                                        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                            data = Uri.fromParts("package", context.packageName, null)
-                                        }
-                                        context.startActivity(intent)
-                                    }
-                                }
-                                // No missing permissions? This button acts as a "Back" button
-                                null -> onRefresh()
-                            }
-                        },
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(
-                            if (nextPermission == null) "All set" else "Continue: ${nextPermission.label}",
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun PermissionStatusCard(statuses: List<PermissionStatus>) {
-    Surface(
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Required permissions:", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
-            Spacer(modifier = Modifier.height(12.dp))
-            statuses.forEach { status ->
-                PermissionStatusRow(status)
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-        }
-    }
-}
-
-@Composable
-internal fun PermissionStatusRow(status: PermissionStatus) {
-    val chipColor = if (status.granted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
-    val contentColor = if (status.granted) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(chipColor, RoundedCornerShape(4.dp))
-            .padding(14.dp, 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(if (status.granted) "●" else "○", fontSize = 18.sp, color = contentColor)
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(status.label, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = contentColor)
-            Text(status.reason, fontSize = 12.sp, color = contentColor)
-        }
-        Text(
-            if (status.granted) "Granted" else "Needed",
-            fontSize = 12.sp, fontWeight = FontWeight.Bold, color = contentColor
-        )
-    }
+    MainDashboard(
+        mutedUntilStr = mutedUntilStr,
+        muteCount = muteCount
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -252,36 +138,24 @@ internal fun PermissionStatusRow(status: PermissionStatus) {
 fun MainDashboard(
     mutedUntilStr: String,
     muteCount: Int,
-    onShowPermissions: () -> Unit
 ) {
     val context = LocalContext.current
 
-    Scaffold(
-        topBar = {
-            Column(modifier = Modifier.background(MaterialTheme.colorScheme.primary).windowInsetsPadding(WindowInsets.statusBars).padding(16.dp, 20.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("✅ Yay", fontSize = 24.sp, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
-
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.2f),
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .padding(start = 8.dp)
-                            .clip(CircleShape)
-                            .clickable { onShowPermissions() }
-                    ) {
-                        Text("?", color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
-                    }
-                }
-                Text(
-                    "All permissions granted, now awaiting notifications. Feel free to dismiss this app.",
-                    fontSize = 13.sp, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-        }
-    ) { padding ->
+    Scaffold { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+            item {
+                Column(modifier = Modifier.background(MaterialTheme.colorScheme.primary).padding(8.dp, 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("✅ Yay", fontSize = 24.sp, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                    }
+                    Text(
+                        "All permissions granted, now awaiting notifications. Feel free to dismiss this app.",
+                        fontSize = 13.sp, color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+
             if (mutedUntilStr.isNotEmpty() || muteCount > 0) {
                 item {
                     ActiveMutesSection(mutedUntilStr, muteCount, context)
@@ -433,7 +307,6 @@ fun CustomMuteSection(context: Context) {
         ) {
             IntWheelPicker(value = hours, max = 48, label = "Hours") { hours = it }
 
-            // Subtle visual separator
             Text("&", fontSize = 24.sp, color = MaterialTheme.colorScheme.outlineVariant)
 
             IntWheelPicker(value = notifs, max = 20, label = "Notifications") { notifs = it }
@@ -448,59 +321,9 @@ fun CustomMuteSection(context: Context) {
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = isActive,
-            shape = RoundedCornerShape(12.dp), // Matches modern Material 3
+            shape = RoundedCornerShape(12.dp),
         ) {
             Text("Apply Custom Mute", fontWeight = FontWeight.Bold)
         }
-    }
-}
-
-
-private fun notificationListenerComponent(context: Context): String {
-    return android.content.ComponentName(context.packageName, NotificationListener::class.java.name).flattenToString()
-}
-
-private fun getPermissionStatuses(context: Context): List<PermissionStatus> {
-    val statuses = mutableListOf<PermissionStatus>()
-
-    if (Build.VERSION.SDK_INT >= 33) {
-        statuses += PermissionStatus(
-            PermissionStep.SendNotifications,
-            "Send notifications",
-            "Required so the app can post alarms.",
-            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
-        )
-    }
-
-    val enabledListeners = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
-    statuses += PermissionStatus(
-        PermissionStep.ReadNotifications,
-        "Read notifications",
-        "Required so the app can detect eligible notifications from other apps.",
-        enabledListeners?.contains(notificationListenerComponent(context)) == true
-    )
-
-    if (Build.VERSION.SDK_INT >= 31) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        statuses += PermissionStatus(
-            PermissionStep.SetExactAlarms,
-            "Set exact alarms",
-            "Required for reliable timing of snooze on an alarming notification.",
-            alarmManager.canScheduleExactAlarms(),
-        )
-    }
-    return statuses
-}
-
-private fun getNotificationListenerSettingsIntent(context: Context): Intent {
-    return if (Build.VERSION.SDK_INT >= 30) {
-        Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).apply {
-            putExtra(
-                Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
-                notificationListenerComponent(context)
-            )
-        }
-    } else {
-        Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
     }
 }

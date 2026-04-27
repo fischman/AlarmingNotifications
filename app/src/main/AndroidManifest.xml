@@ -34,6 +34,12 @@
         </activity>
 
         <activity
+            android:name=".PermissionsActivity"
+            android:exported="false"
+            android:label="Permissions"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
+        <activity
             android:name=".SettingsActivity"
             android:exported="false"
             android:label="Settings"
