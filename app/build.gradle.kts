@@ -21,6 +21,7 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
+            resValue("string", "app_name", "Alarming Notifications (debug)")
         }
         release {
             isMinifyEnabled = true
