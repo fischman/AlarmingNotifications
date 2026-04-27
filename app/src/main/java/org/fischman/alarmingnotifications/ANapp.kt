@@ -7,13 +7,15 @@ import android.content.Context
 import android.content.SharedPreferences
 import java.time.LocalDateTime
 
-private const val packageName = "org.fischman.alarmingnotifications"
 const val notificationChannelID = "AlarmingNotifications-ChannelID"
-const val muteDeadlineKey = packageName + ".muteDeadline"
-const val muteCountKey = packageName + ".muteCount"
-const val ignoreKeepKey = packageName + ".ignoreKeep"
-const val ignoreSuffixKey = packageName + ".ignoreSuffix"
-const val alarmPackagesKey = packageName + ".alarmPackages"
+
+// SharedPreferences keys.
+const val muteDeadlineKey = "muteDeadline"
+const val muteCountKey = "muteCount"
+const val ignoreKeepKey = "ignoreKeep"
+const val ignoreSuffixKey = "ignoreSuffix"
+const val alarmPackagesKey = "alarmPackages"
+
 val defaultAlarmPackages = setOf("com.google.android.calendar")
 
 fun log(msg: String) {
