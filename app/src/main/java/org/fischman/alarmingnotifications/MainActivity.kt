@@ -10,6 +10,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.Menu
+import android.view.MenuItem
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -43,6 +45,26 @@ class MainActivity : ComponentActivity() {
             Theme {
                 MainScreen(onRegisterResumeCallback = { resumeCallback = it })
             }
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.main_actions, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.menu_settings -> {
+                startActivity(Intent(this, SettingsActivity::class.java))
+                true
+            }
+            R.id.menu_permissions -> {
+                // AMI: make this real.
+                // forcePermissionShow = true
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
     }
 
@@ -249,14 +271,6 @@ fun MainDashboard(
                             .clickable { onShowPermissions() }
                     ) {
                         Text("?", color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    IconButton(onClick = {
-                        context.startActivity(Intent(context, SettingsActivity::class.java))
-                    }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onPrimary)
                     }
                 }
                 Text(
