@@ -41,6 +41,7 @@ if $RELEASE; then
 else
   TASK="assembleDebug"
   APK="app/build/outputs/apk/debug/app-debug.apk"
+  PACKAGE="${PACKAGE}.debug"
 fi
 
 echo "==> Building $TASK..."

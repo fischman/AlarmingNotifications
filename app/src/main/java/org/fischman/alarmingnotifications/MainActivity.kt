@@ -441,6 +441,11 @@ fun CustomMuteSection(context: Context) {
     }
 }
 
+
+private fun notificationListenerComponent(context: Context): String {
+    return android.content.ComponentName(context.packageName, NotificationListener::class.java.name).flattenToString()
+}
+
 private fun getPermissionStatuses(context: Context): List<PermissionStatus> {
     val statuses = mutableListOf<PermissionStatus>()
 
@@ -458,7 +463,7 @@ private fun getPermissionStatuses(context: Context): List<PermissionStatus> {
         PermissionStep.ReadNotifications,
         "Read notifications",
         "Required so the app can detect eligible notifications from other apps.",
-        enabledListeners?.contains("${context.packageName}/${context.packageName}.NotificationListener") == true
+        enabledListeners?.contains(notificationListenerComponent(context)) == true
     )
 
     if (Build.VERSION.SDK_INT >= 31) {
@@ -478,7 +483,7 @@ private fun getNotificationListenerSettingsIntent(context: Context): Intent {
         Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).apply {
             putExtra(
                 Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
-                android.content.ComponentName(context.packageName, "${context.packageName}.NotificationListener").flattenToString()
+                notificationListenerComponent(context)
             )
         }
     } else {

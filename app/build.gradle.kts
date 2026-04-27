@@ -21,6 +21,7 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
+            applicationIdSuffix = ".debug"
             resValue("string", "app_name", "Alarming Notifications (debug)")
         }
         release {
