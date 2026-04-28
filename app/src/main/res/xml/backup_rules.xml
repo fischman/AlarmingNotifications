@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <include domain="sharedpref" path="org.fischman.alarmingnotifications_settings_preferences.xml" />
-    <exclude domain="sharedpref" path="org.fischman.alarmingnotifications_mute_preferences.xml" />
 </full-backup-content>
