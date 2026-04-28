@@ -10,6 +10,7 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
@@ -162,20 +163,20 @@ class NotificationListener : NotificationListenerService() {
     }
 
     private fun createPendingIntent(
-        requestCode: Int,
         action: String,
         notificationID: Int,
         label: String,
         originalNotificationKey: String
     ): PendingIntent {
         val intent = Intent(this, NotificationListener::class.java)
+        intent.data = Uri.parse("alarmingnotifications://$action/$notificationID/${originalNotificationKey.hashCode()}") // Uniquify intent.
         intent.putExtra("action", action)
         intent.putExtra("notificationID", notificationID)
         intent.putExtra("label", label)
         intent.putExtra("originalNotificationKey", originalNotificationKey)
         return PendingIntent.getService(
             this,
-            requestCode,
+            0, // Unused but platform requires >= 0.
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -192,11 +193,11 @@ class NotificationListener : NotificationListenerService() {
         originalNotificationKeyToAlarmingID[originalNotificationKey] = notificationID
 
         val stopIntent =
-            createPendingIntent(0, "stop", notificationID, label, originalNotificationKey)
+            createPendingIntent("stop", notificationID, label, originalNotificationKey)
         val snooze1mIntent =
-            createPendingIntent(1, "snooze1m", notificationID, label, originalNotificationKey)
+            createPendingIntent("snooze1m", notificationID, label, originalNotificationKey)
         val snooze5mIntent =
-            createPendingIntent(2, "snooze5m", notificationID, label, originalNotificationKey)
+            createPendingIntent("snooze5m", notificationID, label, originalNotificationKey)
 
         val notificationManager = getSystemService(NotificationManager::class.java)
         val publicVersion = Notification.Builder(this, notificationChannelID)
@@ -318,12 +319,13 @@ class NotificationListener : NotificationListenerService() {
 
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(this, NotificationListener::class.java)
+        intent.data = Uri.parse("alarmingnotifications://resurrect/$notificationID/${originalNotificationKey.hashCode()}") // Uniquify intent.
         intent.putExtra("action", "show")
         intent.putExtra("label", label)
         intent.putExtra("originalNotificationKey", originalNotificationKey)
         val pendingIntent = PendingIntent.getService(
             this,
-            4,
+            0, // Unused but platform requires >= 0.
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
