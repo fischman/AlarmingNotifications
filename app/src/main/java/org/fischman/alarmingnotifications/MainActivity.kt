@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(onRegisterResumeCallback: ((() -> Unit)?) -> Unit = {}) {
     val context = LocalContext.current
-    val prefs = remember { getSharedPreferences(context) }
+    val prefs = remember { getMuteSharedPreferences(context) }
 
     var mutedUntilStr by remember { mutableStateOf(mutedUntil(context)) }
     var muteCount by remember { mutableIntStateOf(muteCountRemaining(context)) }

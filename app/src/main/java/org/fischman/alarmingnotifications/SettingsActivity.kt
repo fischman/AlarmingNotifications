@@ -56,7 +56,7 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val prefs = getSharedPreferences(this)
+        val prefs = getSettingsSharedPreferences(this)
         setContent {
             Theme {
                 SettingsScreen(

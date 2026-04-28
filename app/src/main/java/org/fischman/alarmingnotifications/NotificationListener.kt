@@ -56,7 +56,7 @@ class NotificationListener : NotificationListenerService() {
     }
 
     private fun isInteresting(sbn: StatusBarNotification): Boolean {
-        val prefs = getSharedPreferences(this)
+        val prefs = getSettingsSharedPreferences(this)
 
         // Ignore Keep Reminders, now surfaced as Tasks notifications from Calendar (when Tasks app isn't installed), unless disabled.
         if (prefs.getBoolean(ignoreKeepKey, true)) {

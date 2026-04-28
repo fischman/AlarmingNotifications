@@ -17,13 +17,25 @@ const val ignoreSuffixKey = "ignoreSuffix"
 const val alarmPackagesKey = "alarmPackages"
 
 val defaultAlarmPackages = setOf("com.google.android.calendar")
+private const val settingsPreferencesName = "settings_preferences"
+private const val mutePreferencesName = "mute_preferences"
 
 fun log(msg: String) {
     if (BuildConfig.DEBUG) println(msg)
 }
 
-fun getSharedPreferences(context: Context): SharedPreferences {
-    return context.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE)
+fun getSettingsSharedPreferences(context: Context): SharedPreferences {
+    return context.getSharedPreferences(
+        context.packageName + "_" + settingsPreferencesName,
+        Context.MODE_PRIVATE
+    )
+}
+
+fun getMuteSharedPreferences(context: Context): SharedPreferences {
+    return context.getSharedPreferences(
+        context.packageName + "_" + mutePreferencesName,
+        Context.MODE_PRIVATE
+    )
 }
 
 fun muteForHours(context: Context, hours: Int) {
@@ -32,7 +44,7 @@ fun muteForHours(context: Context, hours: Int) {
         return
     }
     val deadline = LocalDateTime.now().plusHours(hours.toLong()).toString()
-    getSharedPreferences(context).edit().putString(muteDeadlineKey, deadline).apply()
+    getMuteSharedPreferences(context).edit().putString(muteDeadlineKey, deadline).apply()
 }
 
 fun muteForMinutes(context: Context, minutes: Int) {
@@ -41,15 +53,15 @@ fun muteForMinutes(context: Context, minutes: Int) {
         return
     }
     val deadline = LocalDateTime.now().plusMinutes(minutes.toLong()).toString()
-    getSharedPreferences(context).edit().putString(muteDeadlineKey, deadline).apply()
+    getMuteSharedPreferences(context).edit().putString(muteDeadlineKey, deadline).apply()
 }
 
 fun unmuteTime(context: Context) {
-    getSharedPreferences(context).edit().remove(muteDeadlineKey).apply()
+    getMuteSharedPreferences(context).edit().remove(muteDeadlineKey).apply()
 }
 
 fun unmuteCount(context: Context) {
-    getSharedPreferences(context).edit().remove(muteCountKey).apply()
+    getMuteSharedPreferences(context).edit().remove(muteCountKey).apply()
 }
 
 fun muteForNNotifications(context: Context, n: Int) {
@@ -57,16 +69,16 @@ fun muteForNNotifications(context: Context, n: Int) {
         unmuteCount(context)
         return
     }
-    getSharedPreferences(context).edit().putInt(muteCountKey, n).apply()
+    getMuteSharedPreferences(context).edit().putInt(muteCountKey, n).apply()
 }
 
 fun unmuteAll(context: Context) {
-    getSharedPreferences(context).edit().remove(muteDeadlineKey).remove(muteCountKey).apply()
+    getMuteSharedPreferences(context).edit().remove(muteDeadlineKey).remove(muteCountKey).apply()
 }
 
 /** Returns the remaining mute-by-count, or 0 if not count-muted. */
 fun muteCountRemaining(context: Context): Int {
-    return getSharedPreferences(context).getInt(muteCountKey, 0)
+    return getMuteSharedPreferences(context).getInt(muteCountKey, 0)
 }
 
 /**
@@ -74,7 +86,7 @@ fun muteCountRemaining(context: Context): Int {
  * When the count reaches 0 the mute is cleared and false is returned ("not muted, fire alarm").
  */
 fun decrementMuteCount(context: Context): Boolean {
-    val prefs = getSharedPreferences(context)
+    val prefs = getMuteSharedPreferences(context)
     val remaining = prefs.getInt(muteCountKey, 0)
     if (remaining <= 0) return false
     val newVal = remaining - 1
@@ -87,7 +99,7 @@ fun decrementMuteCount(context: Context): Boolean {
 }
 
 fun mutedUntil(context: Context): String {
-    val existingDeadline = getSharedPreferences(context).getString(muteDeadlineKey, null) ?: return ""
+    val existingDeadline = getMuteSharedPreferences(context).getString(muteDeadlineKey, null) ?: return ""
     if (existingDeadline <= LocalDateTime.now().toString()) { return "" }
     val parsedDeadline = LocalDateTime.parse(existingDeadline)
     return parsedDeadline.toString()
