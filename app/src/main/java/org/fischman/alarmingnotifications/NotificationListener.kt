@@ -199,10 +199,16 @@ class NotificationListener : NotificationListenerService() {
             createPendingIntent(2, "snooze5m", notificationID, label, originalNotificationKey)
 
         val notificationManager = getSystemService(NotificationManager::class.java)
+        val publicVersion = Notification.Builder(this, notificationChannelID)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText("Unlock to view details")
+            .build()
         val notificationBuilder =
             Notification.Builder(this, notificationChannelID)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setVisibility(Notification.VISIBILITY_PRIVATE)
+                .setPublicVersion(publicVersion)
                 .setContentTitle(label)
                 .setContentText("")
                 .setCategory(Notification.CATEGORY_CALL)
