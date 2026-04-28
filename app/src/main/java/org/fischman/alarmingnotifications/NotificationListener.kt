@@ -337,10 +337,12 @@ class NotificationListener : NotificationListenerService() {
 
     private fun dismiss(notificationID: Int, originalNotificationKey: String) {
         log("dismiss: notificationID: $notificationID")
-        originalNotificationKeyToAlarmingID.remove(originalNotificationKey)
-        if (mp.isPlaying) mp.stop()
-        getSystemService(NotificationManager::class.java).cancel(notificationID)
+        originalNotificationKeyToAlarmingID.entries.removeIf { it.value == notificationID }
+        if (mp.isPlaying && originalNotificationKeyToAlarmingID.values.none { it >= 0 }) {
+            mp.stop()
+        }
 
+        getSystemService(NotificationManager::class.java).cancel(notificationID)
         cancelNotification(originalNotificationKey)
     }
 
