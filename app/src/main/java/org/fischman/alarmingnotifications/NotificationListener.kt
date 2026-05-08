@@ -23,8 +23,14 @@ class NotificationListener : NotificationListenerService() {
     private val mp = MediaPlayer()
     private var originalNotificationKeyToAlarmingID: MutableMap<String, Int> = mutableMapOf()
 
-    override fun onListenerConnected() = log("onListenerConnected")
-    override fun onListenerDisconnected() = log("onListenerDisconnected")
+    override fun onListenerConnected() {
+        log("onListenerConnected")
+        MuteStatusNotification.startWatching(this)
+    }
+    override fun onListenerDisconnected() {
+        log("onListenerDisconnected")
+        MuteStatusNotification.stopWatching()
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -189,7 +195,7 @@ class NotificationListener : NotificationListenerService() {
             mp.start()
         }
 
-        val notificationID = Random.nextInt(0, 999999)
+        val notificationID = Random.nextInt(0, maxRandomNotificationId)
         originalNotificationKeyToAlarmingID[originalNotificationKey] = notificationID
 
         val stopIntent =
