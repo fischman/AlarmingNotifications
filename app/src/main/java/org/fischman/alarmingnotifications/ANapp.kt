@@ -109,8 +109,12 @@ fun decrementMuteCount(context: Context): Boolean {
 }
 
 fun mutedUntil(context: Context): String {
-    val existingDeadline = getMuteSharedPreferences(context).getString(muteDeadlineKey, null) ?: return ""
-    if (existingDeadline <= LocalDateTime.now().toString()) { return "" }
+    val prefs = getMuteSharedPreferences(context)
+    val existingDeadline = prefs.getString(muteDeadlineKey, null) ?: return ""
+    if (existingDeadline <= LocalDateTime.now().toString()) {
+        prefs.edit().remove(muteDeadlineKey).apply()
+        return ""
+    }
     val parsedDeadline = LocalDateTime.parse(existingDeadline)
     return parsedDeadline.toString()
     // For future reference: val gapInSeconds = Duration.between(LocalDateTime.now(), parsedDeadline).seconds
