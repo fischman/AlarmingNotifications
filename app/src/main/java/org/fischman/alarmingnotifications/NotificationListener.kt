@@ -252,7 +252,7 @@ class NotificationListener : NotificationListenerService() {
     }
 
     private fun bundleToString(bundle: Bundle?): String {
-        if (bundle == null) return "(null bundle))"
+        if (bundle == null) return "(null bundle)"
         var str = "Bundle{"
         @Suppress("DEPRECATION")
         for (key in bundle.keySet()) str += " $key: ${bundle[key]};"
