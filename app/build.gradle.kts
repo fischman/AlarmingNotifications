@@ -13,18 +13,18 @@ android {
     defaultConfig {
         applicationId = "org.fischman.alarmingnotifications"
         minSdk = 30
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "v1.0"
     }
 
     buildTypes {
-        debug {
+        getByName("debug") {
             isDebuggable = true
             applicationIdSuffix = ".debug"
             resValue("string", "app_name", "Alarming Notifications (debug)")
         }
-        release {
+        getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

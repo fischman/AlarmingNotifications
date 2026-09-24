@@ -39,11 +39,10 @@ notifications" permission at leaast will show a scary consent screen
 Pixel device).
 
 ## How to install
-This isn't (yet?) available in Google's Play app store.
 
-Either build using Android Studio (or gradle) from source, or download
-the latest [release](https://github.com/fischman/AlarmingNotifications/releases) APK and install via adb or your side-loading
-mechanism of choice.
+Users who don't want to build the .apk from source have two choices:
+- side-load (using `adb`) an `.apk` downloaded from the [latest release](https://github.com/fischman/AlarmingNotifications/releases/latest) (doesn't get auto-updated with new releases)
+- join the [testers group](https://groups.google.com/g/dwiwph-testers/) and install from the [Google Play Store](https://play.google.com/store/apps/details?id=org.fischman.alarmingnotifications) (link will 404 until group is joined). The group is used for access control only, not email. The group is necessary until the app can pass out of Google Play Store "closed testing" and into ["production access"](https://support.google.com/googleplay/android-developer/answer/14151465#overview), unfortunately.
 
 ## Note to self: How to build a new release
 
