@@ -69,6 +69,10 @@ class MainActivity : ComponentActivity() {
                 startActivity(PermissionsActivity.newIntent(this))
                 true
             }
+            R.id.menu_about -> {
+                startActivity(Intent(this, AboutActivity::class.java))
+                true
+            }
             else -> super.onOptionsItemSelected(item)
         }
     }
