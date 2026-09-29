@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-sudo apt install -y --no-install-recommends default-jdk-headless
+[ "$(id -u)" -eq 0 ] || SUDO=sudo; ${SUDO:-} apt install -y --no-install-recommends default-jdk-headless unzip
 
 ANDROID_HOME="${ANDROID_HOME:-$HOME/android-sdk}"
 echo "Installing Android SDK to $ANDROID_HOME"
@@ -42,6 +42,6 @@ yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
   "ndk;26.1.10909125" `# Must match ../app/build.gradle.kts ndkVersion!`
 
 echo ""
-echo "Done. Add to your shell profile:"
-echo "  export ANDROID_HOME=$ANDROID_HOME"
-echo "  export PATH=\$ANDROID_HOME/platform-tools:\$PATH"
+echo "Done. Adding ANDROID_HOME and its PATH to ~/.bashrc"
+echo "export ANDROID_HOME=$ANDROID_HOME" >> ~/.bashrc
+echo "export PATH=\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/cmdline-tools/latest/bin:\$PATH" >> ~/.bashrc
