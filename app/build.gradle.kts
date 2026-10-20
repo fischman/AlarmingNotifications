@@ -14,8 +14,15 @@ android {
         applicationId = "org.fischman.alarmingnotifications"
         minSdk = 30
         targetSdk = 36
-        versionCode = 2
-        versionName = "v1.1"
+
+        // Bump this once per release; Play uploads get this doubled
+        // and sideloads get it doubled minus one. (Play still won't
+        // overwrite side-loaded because of different signing keys!)
+        val baseVersionCode = 3
+
+        val sideload = project.hasProperty("sideload")
+        versionCode = if (sideload) baseVersionCode * 2 - 1 else baseVersionCode * 2
+        versionName = "v1.$baseVersionCode" + if (sideload) "-sideload" else ""
     }
 
     buildTypes {
