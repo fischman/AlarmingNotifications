@@ -19,10 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -175,7 +172,7 @@ fun SettingsScreen(prefs: SharedPreferences, onBack: () -> Unit) {
                 title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(painterResource(R.drawable.arrow_back_24px), contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -210,11 +207,11 @@ fun SettingsScreen(prefs: SharedPreferences, onBack: () -> Unit) {
                                     }
                                 },
                             placeholder = { Text("Filter apps...") },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            leadingIcon = { Icon(painterResource(R.drawable.search_24px), contentDescription = null) },
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {
                                     IconButton(onClick = { searchQuery = "" }) {
-                                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                        Icon(painterResource(R.drawable.close_24px), contentDescription = "Clear")
                                     }
                                 }
                             },
@@ -235,7 +232,7 @@ fun SettingsScreen(prefs: SharedPreferences, onBack: () -> Unit) {
                                 trailingIcon = if (showSelectedOnly) {
                                     {
                                         Icon(
-                                            imageVector = Icons.Default.Clear,
+                                            painter = painterResource(R.drawable.close_24px),
                                             contentDescription = "Clear filter",
                                             modifier = Modifier.size(FilterChipDefaults.IconSize)
                                         )

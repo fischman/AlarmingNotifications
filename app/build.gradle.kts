@@ -47,6 +47,11 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    sourceSets {
+        getByName("main") {
+            res.srcDir("src/main/res-material-symbols")
+        }
+    }
     buildFeatures {
         viewBinding = true
         buildConfig = true
