@@ -7,6 +7,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
@@ -223,7 +224,7 @@ class NotificationListener : NotificationListenerService() {
                 .setDeleteIntent(stopIntent)
                 .addAction(
                     Notification.Action.Builder(
-                        android.R.drawable.stat_notify_call_mute,
+                        Icon.createWithResource(this, android.R.drawable.stat_notify_call_mute),
                         "Stop",
                         stopIntent
                     )
@@ -232,7 +233,7 @@ class NotificationListener : NotificationListenerService() {
                 )
                 .addAction(
                     Notification.Action.Builder(
-                        android.R.drawable.stat_notify_call_mute,
+                        Icon.createWithResource(this, android.R.drawable.stat_notify_call_mute),
                         "Snooze 1m",
                         snooze1mIntent
                     )
@@ -241,7 +242,7 @@ class NotificationListener : NotificationListenerService() {
                 )
                 .addAction(
                     Notification.Action.Builder(
-                        android.R.drawable.stat_notify_call_mute,
+                        Icon.createWithResource(this, android.R.drawable.stat_notify_call_mute),
                         "Snooze 5m",
                         snooze5mIntent
                     )
