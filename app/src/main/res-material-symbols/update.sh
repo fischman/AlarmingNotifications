@@ -15,6 +15,7 @@ ICONS=(
   "arrow_back/materialsymbolsoutlined/arrow_back_24px.xml arrow_back_24px.xml"
   "close/materialsymbolsoutlined/close_24px.xml close_24px.xml"
   "search/materialsymbolsoutlined/search_24px.xml search_24px.xml"
+  "alarm/materialsymbolsoutlined/alarm_fill1_24px.xml alarm_fill1_24px.xml"
   "warning/materialsymbolsoutlined/warning_fill1_24px.xml warning_fill1_24px.xml"
 )
 

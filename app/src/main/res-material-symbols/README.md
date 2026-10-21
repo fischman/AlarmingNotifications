@@ -20,12 +20,13 @@ resource merger rejects non-resource files like this README inside `drawable/`.
   fill 0 unless the file name says `fill1`
 - Browsable at https://fonts.google.com/icons?icon.set=Material+Symbols&icon.style=Outlined
 
-| File                     | Upstream icon      | Replaces                                                       |
-| ------------------------ | ------------------ | -------------------------------------------------------------- |
-| `arrow_back_24px.xml`    | `arrow_back`       | `Icons.AutoMirrored.Filled.ArrowBack`                          |
-| `close_24px.xml`         | `close`            | `Icons.Default.Clear`                                          |
-| `search_24px.xml`        | `search`           | `Icons.Default.Search`                                         |
-| `warning_fill1_24px.xml` | `warning` (filled) | `android.R.drawable.ic_dialog_alert` (notification small icon) |
+| File                     | Upstream icon      | Replaces                                                          |
+| ------------------------ | ------------------ | ----------------------------------------------------------------- |
+| `alarm_fill1_24px.xml`   | `alarm` (filled)   | `android.R.drawable.ic_lock_idle_alarm` (notification small icon) |
+| `arrow_back_24px.xml`    | `arrow_back`       | `Icons.AutoMirrored.Filled.ArrowBack`                             |
+| `close_24px.xml`         | `close`            | `Icons.Default.Clear`                                             |
+| `search_24px.xml`        | `search`           | `Icons.Default.Search`                                            |
+| `warning_fill1_24px.xml` | `warning` (filled) | `android.R.drawable.ic_dialog_alert` (notification small icon)    |
 
 ## Local modification
 
