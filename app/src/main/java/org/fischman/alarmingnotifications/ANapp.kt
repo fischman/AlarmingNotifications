@@ -189,7 +189,7 @@ object MuteStatusNotification {
 
         val text = "Muted: ${parts.joinToString(" & ")}"
         val n = Notification.Builder(ctx, muteStatusChannelID)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setSmallIcon(R.drawable.warning_fill1_24px)
             .setContentTitle("🔕 *Not* Alarming for Notifications")
             .setContentText(text)
             .setOngoing(true)

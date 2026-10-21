@@ -15,12 +15,14 @@ ICONS=(
   "arrow_back/materialsymbolsoutlined/arrow_back_24px.xml arrow_back_24px.xml"
   "close/materialsymbolsoutlined/close_24px.xml close_24px.xml"
   "search/materialsymbolsoutlined/search_24px.xml search_24px.xml"
+  "warning/materialsymbolsoutlined/warning_fill1_24px.xml warning_fill1_24px.xml"
 )
 
 for entry in "${ICONS[@]}"; do
   read -r src dst <<<"$entry"
   # Upstream tints with ?attr/colorControlNormal, an AppCompat attribute this
-  # app doesn't have; drop it (Compose's Icon() applies its own tint).
+  # app doesn't have; drop it (Compose's Icon() applies its own tint, and
+  # notification small icons only use alpha).
   curl -fsSL "$BASE/$src" | perl -0pe 's/\s+android:tint="\?attr\/colorControlNormal"//' > "drawable/$dst"
   echo "drawable/$dst <- $src @ $REV"
 done

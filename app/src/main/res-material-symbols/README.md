@@ -20,17 +20,19 @@ resource merger rejects non-resource files like this README inside `drawable/`.
   fill 0 unless the file name says `fill1`
 - Browsable at https://fonts.google.com/icons?icon.set=Material+Symbols&icon.style=Outlined
 
-| File                  | Upstream icon | Replaces (Compose `Icons.*`)      |
-|-----------------------|---------------|-----------------------------------|
-| `arrow_back_24px.xml` | `arrow_back`  | `Icons.AutoMirrored.Filled.ArrowBack` |
-| `close_24px.xml`      | `close`       | `Icons.Default.Clear`             |
-| `search_24px.xml`     | `search`      | `Icons.Default.Search`            |
+| File                     | Upstream icon      | Replaces                                                       |
+| ------------------------ | ------------------ | -------------------------------------------------------------- |
+| `arrow_back_24px.xml`    | `arrow_back`       | `Icons.AutoMirrored.Filled.ArrowBack`                          |
+| `close_24px.xml`         | `close`            | `Icons.Default.Clear`                                          |
+| `search_24px.xml`        | `search`           | `Icons.Default.Search`                                         |
+| `warning_fill1_24px.xml` | `warning` (filled) | `android.R.drawable.ic_dialog_alert` (notification small icon) |
 
 ## Local modification
 
 Upstream files set `android:tint="?attr/colorControlNormal"`, an AppCompat
 attribute this app doesn't define, so resource linking fails. That attribute
-is stripped; Compose's `Icon()` applies its own tint anyway.
+is stripped; Compose's `Icon()` applies its own tint anyway, and notification
+small icons only use alpha.
 
 ## Updating
 
