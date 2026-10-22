@@ -46,15 +46,9 @@ Users who don't want to build the .apk from source have two choices:
 
 ## Note to self: How to build a new release
 
-On an exe.dev VM:
-- `./.headless/build-and-deploy.sh --release`
-
-In a local dev-containers/sojourn container:
-- `sojourn new AlarmingNotifications . -v "${HOME}/keystores:/root/keystores"`
-- `./.headless/install-android-sdk.sh` (only needed once per container)
-- `./android-sdk/platform-tools/adb pair <IP>:<PORT>` (Developer Options -> Wireless debugging -> Pair device with pairing code; use that popup's port, which will be different to the "IP address & Port" in Wireless debugging!)
-- `./android-sdk/platform-tools/adb connect <IP>:<PORT>` (now use the Wireless debugging IP & Port, not pairing port!)
-- `./.headless/build-and-deploy.sh --release`
+- Ensure checkout has submodules; either `git clone --recurse-submodules <url>` or if already cloned: `git submodule update --init --recursive`.
+- Once per container: `./.headless/install-android-sdk.sh`
+- `./.headless/build-and-deploy.sh` or `./.headless/build-and-deploy.sh --release`
 
 In Android Studio:
 - Build -> Generate Signed Bundle/APK -> APK
